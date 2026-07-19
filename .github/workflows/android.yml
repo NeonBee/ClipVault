@@ -1,0 +1,65 @@
+name: Android CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Install Android toolchain
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Unit, lint, native and APK checks
+        run: ./gradlew --no-daemon testDebugUnitTest lintDebug externalNativeBuildDebug assembleDebug
+      - name: Assert offline manifest
+        run: |
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt" dump permissions app/build/outputs/apk/debug/app-debug.apk | tee permissions.txt
+          if grep -q "android.permission.INTERNET" permissions.txt; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clipvault-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  instrumentation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Install build toolchain
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Encrypted migration, backup, native and Compose tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: ./gradlew --no-daemon connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.LargeTest

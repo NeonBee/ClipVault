@@ -1,0 +1,18 @@
+# Changelog
+
+## 2.0.0
+
+- Rebuilt the application UI in Kotlin and Jetpack Compose with adaptive navigation, Paging 3 and Persian/English layouts.
+- Added System, Light, Dark and AMOLED modes, Dynamic Color, six accent palettes, reduced motion and adjustable font scale.
+- Migrated SQLCipher to schema v2 with FTS5, metadata, repeated-capture counts, collections, tags, capture rules and 30-day Trash.
+- Expanded native classification and sensitive-content detection.
+- Upgraded the Shizuku bridge to AIDL protocol v2 with event callbacks and adaptive polling fallback.
+- Added share/process-text targets, a Quick Settings tile, diagnostics and retention maintenance after unlock.
+- Added versioned Argon2id + AES-256-GCM local backup and transactional merge/replace restore.
+- Added advanced search, bulk favorite/pin/move/tag/export actions, multi-select Trash recovery and confirmed invalid-key reset.
+- Added CI unit/lint/native/offline checks plus emulator coverage for migration, backup, rules, classifier, query, retention, every theme and primary Compose navigation.
+- Added an opt-in physical-device test for the live Shizuku protocol-v2 UserService bridge.
+
+## 1.0.0
+
+- Initial encrypted clipboard capture release.

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ClipVault</string>
+    <string name="library">کتابخانه</string><string name="collections">مجموعه‌ها</string><string name="insights">آمار</string><string name="settings">تنظیمات</string>
+    <string name="lock_screen_description">تاریخچهٔ رمزنگاری‌شدهٔ کلیپ‌بورد با اثر انگشت قوی محافظت می‌شود.</string><string name="unlock_vault">باز کردن خزانه</string><string name="offline_encrypted">کاملاً آفلاین · رمزنگاری SQLCipher</string><string name="pending_count">%1$d مورد رمز‌شده در انتظار ورود</string>
+    <string name="biometric_unavailable">احراز هویت بیومتریک قوی در دسترس نیست.</string><string name="biometric_failed">اثر انگشت تأیید نشد؛ دوباره تلاش کنید.</string><string name="crypto_object_missing">CryptoObject امن در دسترس نیست.</string><string name="key_invalidated">کلید بیومتریک نامعتبر شده و خزانه بدون کلید اصلی قابل بازیابی نیست.</string><string name="unlock_failed">باز کردن خزانهٔ رمزنگاری‌شده ناموفق بود.</string>
+    <string name="unlock_prompt_title">باز کردن ClipVault</string><string name="unlock_prompt_subtitle">برای بازکردن کلید SQLCipher احراز هویت کنید</string>
+    <string name="cancel">انصراف</string><string name="save">ذخیره</string><string name="add">افزودن</string><string name="retry">تلاش مجدد</string><string name="lock">قفل</string><string name="sort">مرتب‌سازی</string><string name="search_hint">جست‌وجو در متن، عنوان، یادداشت یا دامنه</string><string name="clip_count">%1$d کلیپ</string><string name="selected_count">%1$d انتخاب‌شده</string>
+    <string name="pin">سنجاق</string><string name="pinned">سنجاق‌شده‌ها</string><string name="favorite">علاقه‌مندی</string><string name="favorites">علاقه‌مندی‌ها</string><string name="copy">کپی</string><string name="delete">حذف</string><string name="clipboard_copied">با موفقیت کپی شد</string><string name="empty_library">کتابخانهٔ کلیپ‌بورد خالی است.</string>
+    <string name="all">همه</string><string name="today">امروز</string><string name="yesterday">دیروز</string><string name="this_week">این هفته</string><string name="links">لینک‌ها</string><string name="instagram">اینستاگرام</string><string name="youtube">یوتیوب</string><string name="telegram">تلگرام</string><string name="github">گیت‌هاب</string><string name="persian">فارسی</string><string name="english">انگلیسی</string><string name="mixed">ترکیبی</string><string name="long_text">متن بلند</string><string name="dates">تاریخ‌ها</string><string name="email">ایمیل</string><string name="phone">تلفن</string><string name="code">کد</string><string name="json">JSON</string>
+    <string name="newest">جدیدترین</string><string name="oldest">قدیمی‌ترین</string><string name="frequent">پرتکرارترین</string><string name="longest">طولانی‌ترین</string><string name="new_collection">مجموعهٔ جدید</string><string name="collection_name">نام مجموعه</string>
+    <string name="insights_local_only">آمار خصوصی روی دستگاه؛ بدون آنالیتیکس و بدون اتصال شبکه.</string><string name="total_clips">کل کلیپ‌ها</string><string name="captured_today">ثبت امروز</string><string name="duplicate_saves">ثبت تکراری</string><string name="characters">کاراکتر</string>
+    <string name="capture">ثبت کلیپ‌بورد</string><string name="capture_running">ثبت کلیپ‌بورد فعال است</string><string name="capture_stopped">ثبت کلیپ‌بورد متوقف است</string><string name="skip_sensitive">نادیده‌گرفتن OTP و متن حساس</string><string name="skip_sensitive_summary">از ذخیرهٔ احتمالی رمز، کد یک‌بارمصرف و شماره پرداخت جلوگیری می‌کند</string>
+    <string name="retention">مدت نگهداری</string><string name="one_month">یک ماه</string><string name="three_months">سه ماه</string><string name="six_months">شش ماه</string><string name="forever">برای همیشه</string><string name="custom">سفارشی</string><string name="custom_retention">مدت سفارشی برحسب روز</string>
+    <string name="trash">سطل زباله</string><string name="trash_retention">کلیپ‌های حذف‌شده تا ۳۰ روز قابل بازیابی‌اند.</string><string name="empty_trash">سطل زباله خالی است.</string><string name="restore">بازیابی</string><string name="delete_forever">حذف همیشگی</string>
+    <string name="appearance">ظاهر</string><string name="theme_mode">حالت تم</string><string name="system">سیستم</string><string name="light">روشن</string><string name="dark">تیره</string><string name="amoled">AMOLED</string><string name="dynamic_color">رنگ پویا</string><string name="dynamic_color_summary">استفاده از رنگ دستگاه در اندروید ۱۲ و جدیدتر</string><string name="accent_color">رنگ تأکیدی</string><string name="reduced_motion">حرکت کمتر</string><string name="reduced_motion_summary">کاهش انیمیشن‌های غیرضروری</string><string name="live_preview">پیش‌نمایش زندهٔ تم</string><string name="live_preview_summary">کارت‌ها و کنترل‌ها فوری تغییر می‌کنند.</string><string name="action">عملیات</string>
+    <string name="language">زبان</string><string name="capture_rules">قوانین ثبت</string><string name="add_rule">افزودن قانون مسدودسازی</string><string name="rule_pattern">الگو یا محدودیت</string><string name="rule_block_only">متن منطبق ذخیره نمی‌شود؛ RE2/J جلوی regexهای سنگین را می‌گیرد.</string>
+    <string name="encrypted_backup">پشتیبان رمزنگاری‌شده</string><string name="backup_description">فایل محلی .cvault با Argon2id و AES-256-GCM ساخته یا بازیابی می‌شود.</string><string name="export_backup">خروجی</string><string name="import_backup">ورود</string><string name="backup_passphrase_title">گذرواژهٔ پشتیبان</string><string name="passphrase">گذرواژه</string><string name="confirm_passphrase">تکرار گذرواژه</string><string name="backup_passphrase_error">حداقل ۱۲ کاراکتر یکسان وارد کنید.</string><string name="backup_complete">پشتیبان رمزنگاری‌شده ساخته شد.</string><string name="backup_failed">عملیات پشتیبان ناموفق بود.</string><string name="import_complete">%1$d کلیپ وارد شد.</string><string name="merge">ادغام</string><string name="replace">جایگزینی</string><string name="import_preview">پیش‌نمایش ورود</string><string name="import_preview_counts">%1$d کلیپ · %2$d مجموعه · %3$d برچسب · %4$d قانون</string><string name="type_replace">برای تأیید REPLACE را وارد کنید</string><string name="replace_auth_title">برای جایگزینی خزانه احراز هویت کنید</string>
+    <string name="diagnostics">عیب‌یابی</string><string name="shizuku">شیزوکو</string><string name="ready">آماده</string><string name="offline">خاموش</string><string name="pending_staging">صف رمزنگاری‌شده</string><string name="database">دیتابیس</string><string name="encrypted_unlocked">رمزشده · باز</string><string name="network_permission">مجوز اینترنت</string><string name="not_present">وجود ندارد</string>
+    <string name="clip_detail">جزئیات کلیپ</string><string name="title">عنوان</string><string name="content">محتوا</string><string name="note">یادداشت خصوصی</string><string name="shizuku_ready">شیزوکو آماده است</string><string name="shizuku_offline">شیزوکو در دسترس نیست</string><string name="shizuku_start_required">ابتدا شیزوکو را اجرا و سپس مجوز ClipVault را تأیید کنید.</string><string name="capture_permission_needed">برای ثبت پس‌زمینه مجوز شیزوکو لازم است.</string>
+    <string name="capture_channel">ثبت کلیپ‌بورد</string><string name="capture_notification_title">ثبت ClipVault</string><string name="capture_notification_body">ثبت رمزنگاری‌شدهٔ کلیپ‌بورد فعال است</string><string name="disable_capture">توقف</string><string name="lock_now">قفل خزانه</string><string name="quick_tile_label">ثبت ClipVault</string>
+    <string name="back">بازگشت</string>
+    <string name="more_actions">عملیات بیشتر</string>
+    <string name="move_to_collection">انتقال به مجموعه</string>
+    <string name="add_tag">افزودن برچسب</string>
+    <string name="export_selected">خروجی متن‌های انتخاب‌شده</string>
+    <string name="select_collection">انتخاب مجموعه</string>
+    <string name="select_tag">انتخاب برچسب</string>
+    <string name="no_collection">بدون مجموعه</string>
+    <string name="empty_list">هنوز موردی ساخته نشده است.</string>
+    <string name="tags">برچسب‌ها</string>
+    <string name="new_tag">برچسب جدید</string>
+    <string name="tag_name">نام برچسب</string>
+    <string name="advanced_search">جست‌وجوی پیشرفته</string>
+    <string name="clear_filters">پاک‌کردن</string>
+    <string name="search_content_title_note_domain">محتوا، عنوان، یادداشت یا دامنه</string>
+    <string name="domain_filter">دامنه (example.com)</string>
+    <string name="no_search_results">هیچ کلیپی با این فیلترها پیدا نشد.</string>
+    <string name="delete_selected_confirmation">%1$d کلیپ انتخاب‌شده برای همیشه حذف شوند؟ این کار برگشت‌پذیر نیست.</string>
+    <string name="auto_lock_timeout">قفل خودکار در پس‌زمینه</string>
+    <string name="immediately">فوری</string>
+    <string name="thirty_seconds">۳۰ ثانیه</string>
+    <string name="one_minute">۱ دقیقه</string>
+    <string name="five_minutes">۵ دقیقه</string>
+    <string name="font_scale">اندازه متن</string>
+    <string name="last_successful_capture">آخرین ثبت موفق</string>
+    <string name="last_sanitized_error">آخرین خطای سانسورشده</string>
+    <string name="never">هرگز</string>
+    <string name="none">بدون خطا</string>
+    <string name="bridge_unavailable">پل شیزوکو در دسترس نیست</string>
+    <string name="key_invalidated_title">کلید خزانه در دسترس نیست</string>
+    <string name="reset_vault">بازنشانی خزانه</string>
+    <string name="type_reset">برای تأیید RESET را وارد کنید</string>
+    <string name="vault_reset_complete">خزانه بازنشانی شد؛ برای ساخت خزانه رمزنگاری‌شده جدید، آن را باز کنید.</string>
+    <string name="reset_failed">بازنشانی امن خزانه انجام نشد.</string>
+</resources>
