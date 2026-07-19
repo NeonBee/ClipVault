@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ink">#121426</color>
+    <color name="ink_muted">#6E718A</color>
+    <color name="surface">#FFFDFE</color>
+    <color name="surface_soft">#F6F4FA</color>
+    <color name="surface_tint">#F0EBFF</color>
+    <color name="primary">#6D4AFF</color>
+    <color name="primary_dark">#4B2FCB</color>
+    <color name="primary_soft">#E9E2FF</color>
+    <color name="secondary">#16B6A2</color>
+    <color name="secondary_soft">#D9F7F1</color>
+    <color name="warning">#FFB44D</color>
+    <color name="danger">#E64A65</color>
+    <color name="line">#E8E5EF</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="transparent">#00000000</color>
+    <color name="night_surface">#171827</color>
+    <color name="night_surface_soft">#202132</color>
+    <color name="night_ink">#F4F1FA</color>
+</resources>
