@@ -12,8 +12,10 @@ import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
 import dev.clipvault.app.data.RetentionPolicy;
+import dev.clipvault.app.data.CaptureRuleEngine;
 import dev.clipvault.app.data.VaultRepository;
 import dev.clipvault.app.nativecore.NativeClassifier;
+import dev.clipvault.app.nativecore.TextAnalysis;
 import dev.clipvault.app.security.SecurePendingStore;
 import dev.clipvault.app.workers.RetentionWorker;
 
@@ -23,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.security.GeneralSecurityException;
 
 public final class ClipVaultApp extends Application {
     public static final String ACTION_DATA_CHANGED = "dev.clipvault.app.DATA_CHANGED";
@@ -31,6 +34,11 @@ public final class ClipVaultApp extends Application {
     public static final String PREF_SKIP_SENSITIVE = "skip_sensitive";
     public static final String PREF_CAPTURE_ENABLED = "capture_enabled";
     public static final String PREF_ONBOARDED = "onboarded";
+    public static final String PREF_CUSTOM_RETENTION_DAYS = "custom_retention_days";
+    public static final String PREF_MAINTENANCE_PENDING = "maintenance_pending";
+    public static final String PREF_LAST_CAPTURE_AT = "last_capture_at";
+    public static final String PREF_LAST_CAPTURE_ERROR = "last_capture_error";
+    public static final String PREF_AUTO_LOCK_MS = "auto_lock_ms";
 
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "clipvault-io");
@@ -42,12 +50,15 @@ public final class ClipVaultApp extends Application {
     private volatile boolean unlocked;
     private SecurePendingStore pendingStore;
     private SharedPreferences settings;
+    private final CaptureRuleEngine ruleEngine = new CaptureRuleEngine();
+    private AppContainer container;
 
     @Override
     public void onCreate() {
         super.onCreate();
         pendingStore = new SecurePendingStore(this);
         settings = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        container = new AppContainer(this);
         scheduleRetentionMaintenance();
     }
 
@@ -64,6 +75,11 @@ public final class ClipVaultApp extends Application {
     @NonNull
     public SharedPreferences settings() {
         return settings;
+    }
+
+    @NonNull
+    public AppContainer container() {
+        return container;
     }
 
     public boolean isUnlocked() {
@@ -86,14 +102,13 @@ public final class ClipVaultApp extends Application {
             unlocked = true;
             if (old != null) old.close();
 
-            int retention = settings.getInt(PREF_RETENTION_MONTHS, RetentionPolicy.FOREVER);
+            ruleEngine.replace(opened.rules());
+
             long now = System.currentTimeMillis();
-            if (retention != RetentionPolicy.FOREVER) {
-                long cutoff = RetentionPolicy.cutoffForMonths(retention, now);
-                opened.deleteOlderThan(cutoff);
-                pendingStore.purgeOlderThan(cutoff);
-            }
+            int retention = settings.getInt(PREF_RETENTION_MONTHS, RetentionPolicy.FOREVER);
+            runMaintenance(opened, now);
             int imported = importPending(opened, retention, now);
+            settings.edit().putBoolean(PREF_MAINTENANCE_PENDING, false).apply();
             notifyDataChanged();
             return imported;
         } finally {
@@ -109,8 +124,14 @@ public final class ClipVaultApp extends Application {
             List<Long> consumed = new ArrayList<>(batch.size());
             for (SecurePendingStore.PendingClip pendingClip : batch) {
                 if (RetentionPolicy.shouldKeep(pendingClip.createdAt, retention, now)) {
-                    target.insert(pendingClip.content, pendingClip.createdAt);
-                    imported++;
+                    TextAnalysis analysis = NativeClassifier.analyze(pendingClip.content);
+                    long matchingRule = ruleEngine.firstMatch(analysis);
+                    if (matchingRule == -1L) {
+                        target.insert(analysis, pendingClip.createdAt);
+                        imported++;
+                    } else {
+                        target.recordRuleMatch(matchingRule, pendingClip.createdAt);
+                    }
                 }
                 consumed.add(pendingClip.id);
             }
@@ -129,31 +150,87 @@ public final class ClipVaultApp extends Application {
         });
     }
 
+    /** Irreversibly removes vault and staging data after explicit UI confirmation. Call on the IO executor. */
+    public void resetVaultFiles() throws GeneralSecurityException {
+        unlocked = false;
+        VaultRepository closing = repository;
+        repository = null;
+        if (closing != null) closing.close();
+        pendingStore.close();
+        if (!deleteDatabase("clipvault.db")) {
+            java.io.File database = getDatabasePath("clipvault.db");
+            if (database.exists()) throw new IllegalStateException("Could not delete the encrypted vault");
+        }
+        if (!deleteDatabase("pending_encrypted.db")) {
+            java.io.File pendingDatabase = getDatabasePath("pending_encrypted.db");
+            if (pendingDatabase.exists()) throw new IllegalStateException("Could not delete encrypted staging data");
+        }
+        SecurePendingStore.destroyKeys();
+        pendingStore = new SecurePendingStore(this);
+        ruleEngine.replace(java.util.Collections.emptyList());
+        settings.edit().putBoolean(PREF_CAPTURE_ENABLED, false)
+                .putBoolean(PREF_MAINTENANCE_PENDING, false).apply();
+    }
+
     public void capture(@NonNull String rawText, long createdAt) {
-        String normalized = NativeClassifier.normalize(rawText);
-        if (normalized.isEmpty()) return;
-        if (settings.getBoolean(PREF_SKIP_SENSITIVE, true) && NativeClassifier.isSensitive(normalized)) return;
+        TextAnalysis analysis = NativeClassifier.analyze(rawText);
+        if (analysis.normalized.isEmpty()) return;
+        if (settings.getBoolean(PREF_SKIP_SENSITIVE, true) && analysis.sensitive) return;
+        long matchingRule = ruleEngine.firstMatch(analysis);
+        if (matchingRule != -1L) {
+            ioExecutor.execute(() -> {
+                VaultRepository openRepository = repository();
+                if (openRepository != null) openRepository.recordRuleMatch(matchingRule, createdAt);
+                notifyDataChanged();
+            });
+            return;
+        }
         ioExecutor.execute(() -> {
             VaultRepository openRepository = repository();
             if (openRepository != null) {
-                openRepository.insert(normalized, createdAt);
+                openRepository.insert(analysis, createdAt);
             } else {
-                pendingStore.add(normalized, createdAt);
+                pendingStore.add(analysis.normalized, createdAt);
             }
+            settings.edit().putLong(PREF_LAST_CAPTURE_AT, createdAt)
+                    .putString(PREF_LAST_CAPTURE_ERROR, "").apply();
             notifyDataChanged();
         });
     }
 
     public void applyRetentionNow() {
         ioExecutor.execute(() -> {
-            int retention = settings.getInt(PREF_RETENTION_MONTHS, RetentionPolicy.FOREVER);
-            if (retention == RetentionPolicy.FOREVER) return;
-            long cutoff = RetentionPolicy.cutoffForMonths(retention, System.currentTimeMillis());
-            pendingStore.purgeOlderThan(cutoff);
             VaultRepository openRepository = repository();
-            if (openRepository != null) openRepository.deleteOlderThan(cutoff);
+            if (openRepository == null) {
+                settings.edit().putBoolean(PREF_MAINTENANCE_PENDING, true).apply();
+                return;
+            }
+            runMaintenance(openRepository, System.currentTimeMillis());
             notifyDataChanged();
         });
+    }
+
+    public void refreshRules() {
+        ioExecutor.execute(() -> {
+            VaultRepository openRepository = repository();
+            if (openRepository != null) ruleEngine.replace(openRepository.rules());
+        });
+    }
+
+    private void runMaintenance(@NonNull VaultRepository target, long now) {
+        int customDays = settings.getInt(PREF_CUSTOM_RETENTION_DAYS, 0);
+        int months = settings.getInt(PREF_RETENTION_MONTHS, RetentionPolicy.FOREVER);
+        long cutoff = Long.MIN_VALUE;
+        if (customDays >= RetentionPolicy.MIN_CUSTOM_DAYS && customDays <= RetentionPolicy.MAX_CUSTOM_DAYS) {
+            cutoff = RetentionPolicy.cutoffForCustomDays(customDays, now);
+        } else if (months != RetentionPolicy.FOREVER) {
+            cutoff = RetentionPolicy.cutoffForMonths(months, now);
+        }
+        if (cutoff != Long.MIN_VALUE) {
+            target.softDeleteOlderThan(cutoff, now);
+            pendingStore.purgeOlderThan(cutoff);
+        }
+        target.purgeTrashOlderThan(RetentionPolicy.trashCutoff(now));
     }
 
     private void notifyDataChanged() {

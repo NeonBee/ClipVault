@@ -27,14 +27,14 @@ import java.util.concurrent.TimeUnit;
 public final class ClipboardCaptureService extends Service {
     public static final String ACTION_START = "dev.clipvault.app.capture.START";
     public static final String ACTION_STOP = "dev.clipvault.app.capture.STOP";
+    public static final String ACTION_LOCK = "dev.clipvault.app.capture.LOCK";
     private static final String CHANNEL_ID = "secure_clipboard_capture";
     private static final int NOTIFICATION_ID = 1207;
 
-    private final Object lastClipLock = new Object();
     private ScheduledExecutorService poller;
     private ClipboardManager clipboardManager;
     private ShizukuController shizukuController;
-    private String lastClip;
+    private ClipboardCaptureCoordinator coordinator;
 
     private final ClipboardManager.OnPrimaryClipChangedListener localListener = this::captureLocalClipboard;
 
@@ -44,14 +44,20 @@ public final class ClipboardCaptureService extends Service {
         createNotificationChannel();
         clipboardManager = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         clipboardManager.addPrimaryClipChangedListener(localListener);
-        shizukuController = new ShizukuController(this, ready -> updateNotification());
+        coordinator = new ClipboardCaptureCoordinator(text ->
+                ((ClipVaultApp) getApplication()).capture(text, System.currentTimeMillis()));
+        shizukuController = new ShizukuController(this, ready -> {
+            getSharedPreferences(ClipVaultApp.PREFS, MODE_PRIVATE).edit()
+                    .putString(ClipVaultApp.PREF_LAST_CAPTURE_ERROR, ready ? "" : "bridge_unavailable").apply();
+            updateNotification();
+        }, coordinator::accept);
         shizukuController.start();
         poller = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "shizuku-clipboard-poller");
             thread.setPriority(Thread.NORM_PRIORITY - 1);
             return thread;
         });
-        poller.scheduleWithFixedDelay(this::pollPrivilegedClipboard, 0, 850, TimeUnit.MILLISECONDS);
+        poller.schedule(this::pollPrivilegedClipboard, 0, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -61,6 +67,11 @@ public final class ClipboardCaptureService extends Service {
                     .putBoolean(ClipVaultApp.PREF_CAPTURE_ENABLED, false).apply();
             stopSelf();
             return START_NOT_STICKY;
+        }
+        if (intent != null && ACTION_LOCK.equals(intent.getAction())) {
+            ((ClipVaultApp) getApplication()).lockVault();
+            updateNotification();
+            return START_STICKY;
         }
         getSharedPreferences(ClipVaultApp.PREFS, MODE_PRIVATE).edit()
                 .putBoolean(ClipVaultApp.PREF_CAPTURE_ENABLED, true).apply();
@@ -74,8 +85,10 @@ public final class ClipboardCaptureService extends Service {
     }
 
     private void pollPrivilegedClipboard() {
-        String text = shizukuController.readText();
-        captureIfChanged(text);
+        long delay = coordinator.poll(shizukuController);
+        if (poller != null && !poller.isShutdown()) {
+            poller.schedule(this::pollPrivilegedClipboard, delay, TimeUnit.MILLISECONDS);
+        }
     }
 
     private void captureLocalClipboard() {
@@ -83,19 +96,10 @@ public final class ClipboardCaptureService extends Service {
             ClipData clip = clipboardManager.getPrimaryClip();
             if (clip == null || clip.getItemCount() == 0) return;
             CharSequence text = clip.getItemAt(0).coerceToText(this);
-            captureIfChanged(text == null ? null : text.toString());
+            coordinator.accept(text == null ? null : text.toString());
         } catch (SecurityException ignored) {
             // Android 10+ blocks this fallback when the app is not focused.
         }
-    }
-
-    private void captureIfChanged(@Nullable String text) {
-        if (text == null || text.trim().isEmpty()) return;
-        synchronized (lastClipLock) {
-            if (text.equals(lastClip)) return;
-            lastClip = text;
-        }
-        ((ClipVaultApp) getApplication()).capture(text, System.currentTimeMillis());
     }
 
     private void createNotificationChannel() {
@@ -115,6 +119,9 @@ public final class ClipboardCaptureService extends Service {
         Intent stopIntent = new Intent(this, ClipboardCaptureService.class).setAction(ACTION_STOP);
         PendingIntent stopPendingIntent = PendingIntent.getService(
                 this, 2, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Intent lockIntent = new Intent(this, ClipboardCaptureService.class).setAction(ACTION_LOCK);
+        PendingIntent lockPendingIntent = PendingIntent.getService(
+                this, 3, lockIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         String status = shizukuController != null && shizukuController.isReady()
                 ? getString(R.string.capture_notification_body)
@@ -128,7 +135,8 @@ public final class ClipboardCaptureService extends Service {
                 .setOnlyAlertOnce(true)
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                .addAction(R.drawable.ic_lock, getString(R.string.disable_capture), stopPendingIntent)
+                .addAction(R.drawable.ic_lock, getString(R.string.lock_now), lockPendingIntent)
+                .addAction(R.drawable.ic_bolt, getString(R.string.disable_capture), stopPendingIntent)
                 .build();
     }
 

@@ -1,25 +1,41 @@
-# Security notes
+# Security policy
 
-## مدل کلید
+## Reporting a vulnerability
 
-رمز تصادفی ۲۵۶ بیتی SQLCipher هرگز به‌صورت plaintext روی دیسک نوشته نمی‌شود. این رمز با یک کلید AES-GCM غیرقابل‌استخراج در Android Keystore بسته‌بندی شده است. Keystore key به احراز هویت بیومتریک در هر استفاده وابسته است و با تغییر enrollment بیومتریک invalid می‌شود.
+Please do not publish exploitable details in a public issue. Use GitHub's private vulnerability reporting for this repository and include the affected version, Android version, device/ROM, reproduction steps and the expected security boundary.
 
-کلیپ‌های دریافت‌شده در حالت قفل داخل دیتابیس staging به‌صورت AES-GCM ذخیره می‌شوند. metadata آن فقط شامل timestamp، IV، ciphertext و HMAC غیرقابل‌برگشت برای deduplication است. کلید staging نیز غیرقابل‌استخراج و داخل Android Keystore است، اما عمداً نیازمند biometric نیست تا ثبت پس‌زمینه در حالت قفل ممکن باشد.
+## Key model
 
-## تصمیم‌های دفاعی
+The SQLCipher database key is 32 random bytes. It is never stored as plaintext. Enrollment encrypts it with an AES-256-GCM key generated inside Android Keystore. That wrapping key is non-exportable, requires user authentication for every use and is invalidated when biometric enrollment changes.
 
-- `FLAG_SECURE` برای جلوگیری از screenshot و نمایش در recent-app previews
-- `allowBackup=false` و exclusion کامل از device transfer/cloud backup
-- SQLCipher `cipher_memory_security` و `secure_delete`
-- SQLCipher logging خاموش است
-- اعلان capture هیچ متن کلیپ‌بوردی را نمایش نمی‌دهد
-- receiver داخلی `NOT_EXPORTED` و service برنامه `exported=false` است
-- clipboardهای بازکپی‌شده با `EXTRA_IS_SENSITIVE` علامت‌گذاری می‌شوند
-- C++ با RELRO/NOW، stack protector و hidden symbol visibility ساخته می‌شود
-- تمام ELFهای بومی پروژه برای دستگاه‌های 16KB-page-size هم‌تراز می‌شوند
+Unlock uses AndroidX `BiometricPrompt` with `BIOMETRIC_STRONG` and passes the initialized cipher as a `CryptoObject`. Successful UI authentication without the authenticated cipher is insufficient to open the database.
 
-## مرز امنیت
+There is intentionally no recovery key, server escrow or bypass. Losing or invalidating the Keystore key makes the existing vault unrecoverable unless the user has an encrypted `.cvault` export and its passphrase.
 
-Shizuku قدرت shell/root را به کد UserService می‌دهد. این قابلیت فقط برای خواندن متن Clipboard استفاده می‌شود و هیچ shell command دلخواه یا API نوشتن سیستم در برنامه وجود ندارد. کاربر باید مجوز Shizuku را صریحاً تأیید کند و هر لحظه می‌تواند سرویس ثبت را از داخل برنامه یا اعلان متوقف کند.
+## Storage
 
-اگر enrollment اثر انگشت تغییر کند، کلید قدیمی طبق طراحی غیرقابل‌استفاده می‌شود. برنامه دادهٔ رمزگذاری‌شده را خودکار حذف یا reset نمی‌کند؛ بازیابی بدون کلید قبلی امکان‌پذیر نیست.
+- Main vault: SQLCipher, `cipher_memory_security=ON`, `secure_delete=ON`, foreign keys and encrypted FTS5.
+- Locked-state staging: a separate SQLite database whose payloads are individually encrypted with AES-256-GCM; deduplication uses an independent Keystore HMAC key.
+- Local backup: Argon2id (64 MiB, 3 iterations, parallelism 1) derives an AES-256-GCM file key. The header is authenticated as AAD.
+- Android backup and device transfer: disabled through manifest and extraction rules.
+
+## Runtime protections
+
+- `FLAG_SECURE` blocks screenshots and recent-app previews.
+- Foreground notifications contain status only, never clipboard content.
+- Copied-back clips use `EXTRA_IS_SENSITIVE` where supported.
+- Vault lock drops repository access immediately and closes SQLCipher on the serialized I/O executor.
+- Screen-off/background timeout and explicit notification lock are supported.
+- Likely OTP, password/token phrases and payment numbers are skipped by default.
+
+## Shizuku boundary
+
+The Shizuku UserService exposes a small AIDL v2 interface: protocol version, read current text, register/unregister clipboard listener and destroy. It does not accept shell commands or expose general system services. Hidden clipboard APIs are accessed reflectively because public Android APIs prohibit continuous background clipboard reads; this can break on vendor ROMs and is not itself a security guarantee.
+
+## Network boundary
+
+The application does not request `android.permission.INTERNET`. It contains no analytics, telemetry, account, advertising or cloud client. CI inspects the packaged APK and fails if the network permission appears.
+
+## Limitations
+
+ClipVault cannot protect plaintext from a compromised OS, root process, malicious accessibility service, process injection or memory inspection while the vault is unlocked. It is not a replacement for a separately audited password manager. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the complete boundary.

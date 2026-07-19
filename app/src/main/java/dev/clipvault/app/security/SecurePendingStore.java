@@ -136,6 +136,16 @@ public final class SecurePendingStore {
                 "pending_clips", "created_at < ?", new String[]{String.valueOf(cutoff)});
     }
 
+    public synchronized void close() {
+        helper.close();
+    }
+
+    public static void destroyKeys() throws GeneralSecurityException {
+        KeyStore keyStore = loadKeyStore();
+        if (keyStore.containsAlias(ENCRYPTION_ALIAS)) keyStore.deleteEntry(ENCRYPTION_ALIAS);
+        if (keyStore.containsAlias(LOOKUP_ALIAS)) keyStore.deleteEntry(LOOKUP_ALIAS);
+    }
+
     @NonNull
     private static SecretKey getOrCreateEncryptionKey() throws GeneralSecurityException {
         KeyStore keyStore = loadKeyStore();

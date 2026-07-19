@@ -1,154 +1,78 @@
 # ClipVault
 
-[English](README.md) · **فارسی**
+ClipVault یک آرشیو آفلاین و رمزنگاری‌شده برای تاریخچهٔ کلیپ‌بورد اندروید است. متن‌ها از طریق یک پل محدود Shizuku دریافت می‌شوند، دیتابیس اصلی با SQLCipher رمز می‌شود و بازکردن کلید آن همیشه به احراز هویت بیومتریک قوی در Android Keystore وابسته است.
 
-ClipVault یک تاریخچه‌ی کلیپ‌بورد محلی برای اندروید است. ایده‌اش ساده است: متن‌هایی که کپی می‌کنیم مفید بمانند، بدون اینکه بی‌سروصدا به داده‌ی ابری تبدیل شوند.
+[English](README.md) · [امنیت](SECURITY.md) · [معماری](docs/ARCHITECTURE.md) · [فرمت پشتیبان](docs/BACKUP_FORMAT.md)
 
-برنامه یک تاریخچه‌ی قابل جست‌وجو می‌سازد، ورودی‌ها را بر اساس تاریخ و نوع محتوا مرتب می‌کند و کلید دیتابیس را پشت احراز هویت بیومتریک قوی نگه می‌دارد. رابط کاربری فارسی و کاملاً راست‌به‌چپ است و لایه‌های ذخیره‌سازی و ثبت عمداً کوچک نگه داشته شده‌اند تا بتوان آن‌ها را بررسی کرد.
+![سیستم تم ClipVault](docs/theme-preview.svg)
 
-## چرا این پروژه ساخته شد؟
+## قابلیت‌ها
 
-از Android 10 به بعد، برنامه‌ای که در foreground نیست نمی‌تواند آزادانه Clipboard را بخواند. بعضی ابزارها برای دورزدن این محدودیت سراغ Accessibility Service می‌روند، اما چنین مجوزی بسیار فراتر از نیاز یک مدیر کلیپ‌بورد است. ClipVault به‌جای آن از یک UserService در [Shizuku](https://shizuku.rikka.app/) استفاده می‌کند که کارش فقط خواندن Clipboard فعلی است و فعال‌شدنش به تأیید صریح کاربر نیاز دارد.
+- ثبت پس‌زمینهٔ متن کلیپ‌بورد با Shizuku، callback رویداد و polling تطبیقی به‌عنوان fallback
+- دیتابیس SQLCipher و صف AES-256-GCM مستقل برای متن‌هایی که هنگام قفل دریافت می‌شوند
+- بازکردن کلید با `BiometricPrompt`، سطح `BIOMETRIC_STRONG`، یک `CryptoObject` واقعی و Android Keystore
+- تشخیص بومی Instagram، YouTube، Telegram، TikTok، X، GitHub، لینک، تاریخ، فارسی، انگلیسی، متن ترکیبی، ایمیل، تلفن، کد و JSON
+- جست‌وجوی رمزنگاری‌شدهٔ FTS5، فیلترهای پیشرفته، دسته‌های هوشمند، مجموعه و برچسب دلخواه، یادداشت، سنجاق، علاقه‌مندی و عملیات کامل انتخاب گروهی
+- سطل زبالهٔ ۳۰روزه و نگهداری یک، سه، شش ماه، همیشگی یا بازهٔ سفارشی ۷ تا ۳۶۵ روز
+- خروجی و ورود فایل نسخه‌دار `.cvault` با Argon2id و AES-256-GCM
+- تم System، Light، Dark و AMOLED، رنگ پویای اندروید ۱۲ به بالا، شش پالت رنگ و پیش‌نمایش زنده
+- رابط کامل فارسی RTL و انگلیسی LTR
 
-این تصمیم روی بقیه‌ی معماری هم اثر گذاشته است: ثبت پس‌زمینه اعلان قابل‌مشاهده دارد، مرز دسترسی ویژه محدود است و وقتی Shizuku در دسترس نباشد، برنامه همچنان به‌عنوان یک خزانه‌ی رمزگذاری‌شده کار می‌کند.
-
-## چه کارهایی انجام می‌دهد؟
-
-- بازکردن کلید دیتابیس با `BiometricPrompt`، `BIOMETRIC_STRONG` و `CryptoObject`
-- دیتابیس کامل SQLCipher با کلید تصادفی ۲۵۶ بیتی
-- نگهداری امن کلیپ‌های زمان قفل در inbox رمز‌شده‌ی AES-256-GCM
-- ثبت پس‌زمینه با Shizuku و یک Foreground Service شفاف و قابل توقف
-- دسته‌بندی خودکار اینستاگرام، یوتیوب، لینک، تاریخ، فارسی، انگلیسی و متن بلند
-- جست‌وجوی زنده، حذف موارد تکراری، علاقه‌مندی، کپی مجدد و حذف
-- گروه‌بندی بر اساس تاریخ و رابط کاملاً راست‌به‌چپ
-- سیاست نگهداری یک، سه، شش ماه یا همیشگی
-- تشخیص اختیاری OTP و متن‌های شبیه رمز عبور برای جلوگیری از ذخیره‌ی ناخواسته
-- قفل خودکار، جلوگیری از screenshot، غیرفعال‌بودن backup و پاک‌سازی کلید session
-- سازگاری کتابخانه‌های بومی با دستگاه‌های دارای page size شانزده کیلوبایت
+برنامه مجوز `INTERNET`، آنالیتیکس، حساب کاربری، فضای ابری و telemetry ندارد.
 
 ## معماری
 
 ```mermaid
-flowchart TD
-    C["Android Clipboard"] --> S["Shizuku UserService<br/>shell identity"]
-    S --> F["Foreground capture service"]
-    F --> L{"Vault unlocked?"}
-    L -->|Yes| Q["SQLCipher database"]
-    L -->|No| P["AES-GCM encrypted inbox"]
-    B["BiometricPrompt + CryptoObject"] --> K["Unwrap database key"]
-    K --> Q
-    K --> I["Import encrypted inbox"]
-    P --> I
-    N["C++ JNI classifier"] --> Q
+flowchart LR
+    C[کلیپ‌بورد اندروید] --> S[Shizuku UserService v2]
+    S --> F[سرویس ثبت پس‌زمینه]
+    F --> A[تحلیل متن C++]
+    A --> L{خزانه باز است؟}
+    L -->|بله| D[SQLCipher v2 + FTS5]
+    L -->|خیر| P[صف AES-GCM]
+    B[BiometricPrompt + CryptoObject] --> K[بازکردن کلید Keystore]
+    K --> D
+    P --> D
+    D --> U[رابط Kotlin + Compose]
 ```
 
-### پشته‌ی فنی
+رابط و presentation با Kotlin، Compose، Navigation، StateFlow و Paging 3 نوشته شده است. مرزهای امنیت، SQLCipher و چرخهٔ Shizuku در Java شفاف باقی مانده‌اند و تحلیل قطعی متن در C++20/JNI اجرا می‌شود. جزئیات بیشتر در [سند معماری](docs/ARCHITECTURE.md) آمده است.
 
-| لایه | فناوری |
-|---|---|
-| رابط و چرخه‌ی عمر | Java 17، Material Components، RecyclerView |
-| احراز هویت | AndroidX BiometricPrompt + Android Keystore |
-| دیتابیس | SQLCipher for Android |
-| ثبت پس‌زمینه | Foreground Service + Shizuku UserService/AIDL |
-| پردازش متن | C++17، JNI و Android NDK |
-| نگهداری دوره‌ای | AndroidX WorkManager |
+## ساخت پروژه
 
-## تصمیم‌های مهندسی
+پیش‌نیازها:
 
-**اثر انگشت از کلید محافظت می‌کند، نه فقط از صفحه.** `BiometricPrompt` با یک `CryptoObject` واقعی اجرا می‌شود. تنها احراز هویت موفق می‌تواند کلید SQLCipher را باز کند؛ عبور از Activity یا بستن یک دیالوگ باعث بازشدن دیتابیس نمی‌شود.
-
-**ثبت در حالت قفل، محل ذخیره‌ی جدا دارد.** منطقی نیست کلید دیتابیس اصلی وقتی خزانه قفل است در حافظه بماند. کلیپ‌های تازه ابتدا داخل یک inbox رمز‌شده با AES-GCM و Android Keystore نوشته می‌شوند و پس از بازشدن بعدی وارد SQLCipher خواهند شد.
-
-**Shizuku فقط یک لایه‌ی سازگاری محدود است.** کد دارای دسترسی ویژه داخل یک AIDL UserService کوچک قرار دارد. این سرویس امکان اجرای فرمان دلخواه نمی‌دهد، صفحه‌ی برنامه‌های دیگر را نمی‌بیند و تنظیمات سیستم را تغییر نمی‌دهد.
-
-**نقش کد بومی مشخص و محدود است.** C++ فقط نرمال‌سازی قطعی و دسته‌بندی چندبرچسبی متن را انجام می‌دهد. چرخه‌ی عمر، هماهنگی رمزنگاری، ذخیره‌سازی و UI در Java باقی مانده‌اند تا رفتار اندروید قابل بررسی‌تر باشد.
-
-**هیچ مسیر شبکه‌ای وجود ندارد.** برنامه مجوز اینترنت، حساب کاربری، analytics، backup راه‌دور یا telemetry ندارد.
-
-## چیزهایی که هدف پروژه نیستند
-
-- همگام‌سازی ابری یا تاریخچه‌ی مشترک بین چند دستگاه
-- اجرای مخفیانه‌ی Shizuku یا عبور از کنترل‌های امنیتی اندروید
-- جایگزین‌شدن با password manager
-- ادعای رفتار کاملاً یکسان روی همه‌ی ROMها بدون تست واقعی
-
-## پیش‌نیازهای بیلد
-
-- Android Studio یا JDK 17/21
-- Android SDK Platform 35
-- Android NDK `27.2.12479018`
+- Android Studio و JDK 17 یا 21
+- Android SDK Platform `37.0` با target SDK 36
+- NDK `27.2.12479018`
 - CMake `3.22.1`
 
-مقادیر SDK، NDK و CMake در [app/build.gradle](app/build.gradle) مشخص شده‌اند. فایل `local.properties` را commit نکنید؛ Android Studio آن را برای هر سیستم می‌سازد.
-
-## بیلد و تست
-
-Windows:
+روی ویندوز:
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
-.\gradlew.bat testDebugUnitTest lintDebug assembleDebug
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+.\gradlew.bat testDebugUnitTest lintDebug externalNativeBuildDebug assembleDebug
 ```
 
-Linux/macOS:
+APK دیباگ در `app/build/outputs/apk/debug/app-debug.apk` ساخته می‌شود. کلید امضای release باید بیرون از repository تعریف شود و هیچ keystore یا secret نباید commit شود.
 
-```bash
-./gradlew testDebugUnitTest lintDebug assembleDebug
-```
-
-APK دیباگ در مسیر زیر ساخته می‌شود:
-
-```text
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-برای انتشار عمومی باید signing config و کلید انتشار خودتان را خارج از repository تعریف کنید. هیچ keystore یا رمز امضایی در پروژه قرار ندارد.
-
-## راه‌اندازی روی گوشی
+## راه‌اندازی گوشی
 
 1. یک اثر انگشت قوی در تنظیمات امنیتی گوشی ثبت کنید.
-2. [Shizuku](https://shizuku.rikka.app/download/) را نصب و با Wireless debugging، ADB یا root راه‌اندازی کنید.
-3. APK را نصب کنید:
+2. [Shizuku](https://shizuku.rikka.app/guide/setup/) را با Wireless debugging، ADB یا root اجرا کنید.
+3. APK را با دستور `adb install -r app/build/outputs/apk/debug/app-debug.apk` نصب کنید.
+4. ClipVault را باز و خزانهٔ بیومتریک را ایجاد کنید.
+5. مجوز Shizuku و اعلان را بدهید و ثبت را از تنظیمات یا Quick Settings فعال کنید.
 
-   ```bash
-   adb install -r app/build/outputs/apk/debug/app-debug.apk
-   ```
+در گوشی بدون root معمولاً پس از reboot باید Shizuku دوباره اجرا شود. API داخلی کلیپ‌بورد ممکن است بین ROMها تغییر کند؛ برنامه وضعیت bridge را شفاف نشان می‌دهد و در صورت نیاز به polling تطبیقی برمی‌گردد.
 
-4. ClipVault را باز کنید و خزانه را با اثر انگشت ایجاد کنید.
-5. «فعال‌سازی ثبت دائمی» را بزنید و مجوزهای Shizuku و اعلان را تأیید کنید.
+## مرز امنیتی
 
-در حالت بدون root، Shizuku پس از هر reboot باید دوباره راه‌اندازی شود. جزئیات در [راهنمای رسمی Shizuku](https://shizuku.rikka.app/guide/setup/) آمده است.
+اثر انگشت از «استفاده از کلید» محافظت می‌کند، نه فقط از یک صفحه. کلید تصادفی SQLCipher به‌شکل plaintext ذخیره نمی‌شود و با کلید AES-GCM غیرقابل‌استخراج Keystore بسته‌بندی شده است. متن کلیپ‌بورد وارد log نمی‌شود، screenshot و recent preview با `FLAG_SECURE` بسته‌اند و backup خودکار اندروید غیرفعال است.
 
-## مدل امنیتی
+پیش از استفاده برای اطلاعات خیلی حساس، [SECURITY.md](SECURITY.md) و [مدل تهدید](docs/THREAT_MODEL.md) را بخوانید. این پروژه جایگزین password manager مستقل و ممیزی‌شده نیست.
 
-- کلید تصادفی SQLCipher به‌صورت plaintext روی دیسک ذخیره نمی‌شود.
-- کلید دیتابیس با AES-GCM و یک کلید غیرقابل‌استخراج Android Keystore بسته‌بندی می‌شود.
-- استفاده از کلید wrapping به احراز هویت بایومتریک در هر بار بازشدن وابسته است.
-- تغییر enrollment اثر انگشت، کلید wrapping قبلی را نامعتبر می‌کند.
-- داده‌های دریافتی هنگام قفل با کلید مستقل Keystore رمز می‌شوند و پس از unlock وارد SQLCipher می‌شوند.
-- Shizuku فقط در UserService کوچک Clipboard استفاده شده و برنامه shell command دلخواه اجرا نمی‌کند.
-- اعلان Foreground Service هیچ محتوای کلیپ‌بوردی نمایش نمی‌دهد.
+## وضعیت
 
-جزئیات بیشتر را در [SECURITY.md](SECURITY.md) بخوانید.
-
-## ساختار پروژه
-
-```text
-app/src/main/
-├── aidl/        رابط محدود Shizuku UserService
-├── cpp/         نرمال‌سازی و دسته‌بندی بومی متن
-├── java/        UI، امنیت، دیتابیس و سرویس ثبت
-└── res/         منابع Material و فارسی RTL
-```
-
-## محدودیت پلتفرم
-
-Android 10 به بعد دسترسی Clipboard را برای برنامه‌های بدون focus، به‌جز IME پیش‌فرض، محدود کرده است. به همین دلیل ثبت دائمی به Shizuku و Foreground Service نیاز دارد. پیاده‌سازی UserService از API داخلی Clipboard استفاده می‌کند؛ ROMهای بسیار سفارشی ممکن است به تطبیق جداگانه نیاز داشته باشند.
-
-## حریم خصوصی
-
-تمام پردازش‌ها روی دستگاه انجام می‌شوند. محتوای Clipboard به هیچ سروری فرستاده نمی‌شود، چون برنامه نه مجوز اینترنت دارد و نه کد ارتباط شبکه‌ای.
-
-## وضعیت پروژه
-
-نسخه‌ی فعلی به‌صورت انتها‌به‌انتها روی یک دستگاه واقعی Android 13 و شبیه‌ساز Android 17/API 37 با page size شانزده کیلوبایت آزمایش شده است. جریان اصلی برنامه کار می‌کند، اما پروژه هنوز جوان است؛ پیش از استفاده‌ی production، تست روی ROMهای بیشتر و یک بازبینی امنیتی مستقل تصمیم منطقی‌تری خواهد بود.
+نسخهٔ `2.0.0` با API 37 build می‌شود و هر چهار ABI اندروید را می‌سازد. مجموعه‌تست دستگاهی آن تمام تم‌ها، ناوبری، انتخاب چندتایی، بازیابی سطل زباله، خطاهای بکاپ رمزنگاری‌شده، برابری تحلیلگر C++ و fallback، مهاجرت واقعی v1 به v2 و جست‌وجوی ایندکس‌شده میان ۲۰هزار کلیپ رمزنگاری‌شده را پوشش می‌دهد. تست‌های امنیت و داده و bind واقعی UserService پروتکل v2 به Shizuku روی یک گوشی Android 13 با HyperOS نیز پاس شده‌اند. رفتار کلیپ‌بورد Shizuku همچنان باید روی ROMهای واقعی بیشتری آزمایش شود.
