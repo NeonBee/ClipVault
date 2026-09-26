@@ -11,6 +11,7 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import org.junit.After
 import org.junit.Assert.assertNotNull
@@ -44,7 +45,9 @@ class VaultNavigationComposeTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             val settings = context.getString(R.string.settings)
             compose.onNodeWithText(settings).performClick()
-            compose.onNodeWithText(context.getString(R.string.appearance)).assertIsDisplayed()
+            // Appearance is the third section of a scrolling Column; on a phone-sized screen it is
+            // composed but below the fold, so scroll before asserting visibility.
+            compose.onNodeWithText(context.getString(R.string.appearance)).performScrollTo().assertIsDisplayed()
 
             compose.onNodeWithText(context.getString(R.string.library)).performClick()
             compose.waitUntilAtLeastOneExists(hasText("compose navigation sample"), 8_000)
