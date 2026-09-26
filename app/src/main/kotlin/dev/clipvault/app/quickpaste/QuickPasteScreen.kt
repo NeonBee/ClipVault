@@ -2,6 +2,7 @@ package dev.clipvault.app.quickpaste
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +58,7 @@ import dev.clipvault.app.R
 import dev.clipvault.app.data.ClipItem
 
 object QuickPasteTags {
+    const val ROOT = "quick_paste_root"
     const val SEARCH = "quick_paste_search"
     const val LIST = "quick_paste_list"
     fun row(index: Int) = "quick_paste_row_$index"
@@ -73,6 +75,12 @@ fun QuickPasteScreen(
     onUnlock: () -> Unit,
     onOpenApp: () -> Unit,
 ) {
+    // The root is focusable so Esc (and Enter on the lock pane) reach the key handler even when no
+    // field or button holds focus; clickable buttons are not focusable in touch mode.
+    val rootFocus = remember { FocusRequester() }
+    LaunchedEffect(state.gate) {
+        if (state.gate != QuickPasteGate.READY) runCatching { rootFocus.requestFocus() }
+    }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
             Column(
@@ -83,12 +91,18 @@ fun QuickPasteScreen(
                             ?: return@onPreviewKeyEvent false
                         when (action) {
                             QuickPasteKeyAction.CLOSE -> onClose()
-                            QuickPasteKeyAction.CONFIRM ->
-                                if (state.gate == QuickPasteGate.READY) onConfirm() else return@onPreviewKeyEvent false
+                            QuickPasteKeyAction.CONFIRM -> when (state.gate) {
+                                QuickPasteGate.READY -> onConfirm()
+                                QuickPasteGate.LOCKED -> onUnlock()
+                                else -> return@onPreviewKeyEvent false
+                            }
                             else -> if (state.gate == QuickPasteGate.READY) onKey(action) else return@onPreviewKeyEvent false
                         }
                         true
-                    },
+                    }
+                    .focusRequester(rootFocus)
+                    .focusable()
+                    .testTag(QuickPasteTags.ROOT),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 when (state.gate) {

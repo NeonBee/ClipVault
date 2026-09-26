@@ -16,7 +16,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
-import androidx.compose.ui.test.requestFocus
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.clipvault.app.R
 import dev.clipvault.app.data.ClipItem
@@ -106,13 +105,16 @@ class QuickPasteScreenComposeTest {
         assertEquals(1, unlocks)
     }
 
-    @Test fun enterDoesNothingWhileLockedButEscStillCloses() {
+    @Test fun lockedPaneTakesKeyboardFocusSoEnterUnlocksAndEscCloses() {
         show(QuickPasteState(gate = QuickPasteGate.LOCKED))
-        // Key events route through focus; nothing is focused on the locked pane until the user tabs in.
-        val unlock = compose.onNodeWithText(context.getString(R.string.unlock_vault)).requestFocus()
-        unlock.performKeyInput { pressKey(Key.Escape); pressKey(Key.Enter) }
-        assertEquals(1, closed)
+        // No field or button is focused here (buttons are not focusable in touch mode); the root is.
+        val root = compose.onNodeWithTag(QuickPasteTags.ROOT)
+        root.assertIsFocused()
+        root.performKeyInput { pressKey(Key.Enter) }
+        assertEquals(1, unlocks)
         assertNull(confirmed)
+        root.performKeyInput { pressKey(Key.Escape) }
+        assertEquals(1, closed)
     }
 
     @Test fun setupRequiredSendsTheUserToTheMainApp() {

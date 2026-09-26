@@ -13,8 +13,8 @@ Terminology: `PR #N` is a GitHub Pull Request number; `WP-NN` is a design Work P
 | recent history | Empty query lists the newest 50 clips (pinned first, same order as the library). |
 | FTS search | `VaultRepository.query` with the existing prefix FTS5 query, 120 ms debounce, 50 results. |
 | arrow navigation | ↑/↓, PgUp/PgDn (5 rows), Ctrl+Home/End. Home/End without Ctrl stay in the text field. |
-| Enter select | Enter / numpad Enter / IME Go copies the selected row. Mouse: first click selects, second copies. |
-| Esc close | Esc and Back close the window. |
+| Enter select | Enter / numpad Enter / IME Go copies the selected row. Mouse: first click selects, second copies. On the lock pane Enter starts the unlock. |
+| Esc close | Esc and Back close the window. The window root takes focus on the lock/setup panes so Esc works there too. |
 | clipboard restore 후 `finish()` | `SensitiveClipboard.write` with `EXTRA_IS_SENSITIVE`, then `finishAndRemoveTask()`. |
 | search query persistence 없음 | Query and results live only in `QuickPasteViewModel`; no saved state, no preferences. Cleared on close, lock and when the window is hidden (hidden = closed). |
 | locked → biometric | Same `BiometricVaultUnlock` (BiometricPrompt + CryptoObject) as MainActivity; prompt opens automatically once. Cancel closes the window. No enrollment from QuickPaste. |
