@@ -88,7 +88,11 @@ public final class VaultRepository implements AutoCloseable {
         database.execSQL("INSERT INTO clips_fts(clips_fts) VALUES('rebuild')");
     }
 
-    /** Moves the rewritten pages into the main file so stale page images do not linger in the WAL. */
+    /**
+     * Moves rewritten pages into the main file and empties the WAL, so page images that still hold
+     * deleted plaintext do not linger in {@code clipvault.db-wal} until it wraps. Runs outside any
+     * transaction after hard deletes, edits and the v2 → v3 migration.
+     */
     private void checkpointAndTruncateWal() {
         try (Cursor cursor = database.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", new String[0])) {
             cursor.moveToFirst();
@@ -413,10 +417,12 @@ public final class VaultRepository implements AutoCloseable {
                 database.update("clips", values, "id=?", new String[]{String.valueOf(id)});
             }
             database.setTransactionSuccessful();
-            return true;
         } finally {
             database.endTransaction();
         }
+        // Old content and FTS pages of the edited or merged clip must not linger in the WAL.
+        checkpointAndTruncateWal();
+        return true;
     }
 
     /** 1.x API now performs recoverable deletion. */
@@ -470,6 +476,7 @@ public final class VaultRepository implements AutoCloseable {
         } finally {
             database.endTransaction();
         }
+        if (changed > 0) checkpointAndTruncateWal();
         return changed;
     }
 
@@ -488,7 +495,9 @@ public final class VaultRepository implements AutoCloseable {
 
     public synchronized int purgeTrashOlderThan(long cutoff) {
         ensureOpen();
-        return database.delete("clips", "deleted_at IS NOT NULL AND deleted_at<?", new String[]{String.valueOf(cutoff)});
+        int purged = database.delete("clips", "deleted_at IS NOT NULL AND deleted_at<?", new String[]{String.valueOf(cutoff)});
+        if (purged > 0) checkpointAndTruncateWal();
+        return purged;
     }
 
     public synchronized long createCollection(@NonNull String name, @NonNull String colorKey) {
