@@ -35,10 +35,10 @@ The code under test includes:
 | Shizuku disconnect / restart recovery | PASS | Capture recovered after the Shizuku path was restarted/re-established. |
 | Samsung DeX clipboard capture | PASS | Clipboard capture worked in DeX, including keyboard-driven copy operations. |
 | Secure Folder clipboard | EXPECTED LIMITATION | Clipboard operations inside Samsung Secure Folder were not visible to the owner-profile ClipVault instance. This is treated as a profile/Knox isolation boundary, not a bridge-v3 defect. |
-| Screen lock / unlock | NOT YET RECORDED | Required by the original PR-04 gate; run once and record result. |
-| Doze / wake | NOT YET RECORDED | Required by the original PR-04 gate; run once and record result. |
-| Oversized payload rejection (>128,000 UTF-16 chars) | NOT YET RECORDED | Contract/CI coverage exists, but the real-device rejection path has not yet been recorded. |
-| READY_EVENT vs READY_POLL | NOT DIRECTLY OBSERVED | Current Settings UI only exposes Shizuku Ready/Offline; it does not display the healthy bridge subtype. Functional capture is confirmed. |
+| Screen lock / unlock | PASS | Capture behavior after screen lock/unlock matched the expected bridge lifecycle and recovered normally. |
+| Doze / wake | PASS | Capture recovered and continued normally after the device entered an idle/sleep state and woke. |
+| Oversized payload rejection (>128,000 UTF-16 chars) | PASS | The oversized clipboard payload was rejected as designed rather than persisted/truncated. |
+| READY_EVENT vs READY_POLL | NOT DIRECTLY OBSERVED | Current Settings UI only exposes Shizuku Ready/Offline; it does not display the healthy bridge subtype. Functional capture is confirmed, so this is non-blocking for PR-04. |
 
 ## Secure Folder boundary
 
@@ -58,24 +58,27 @@ Cross-profile clipboard capture is out of scope for PR-04. If Secure Folder supp
 
 ## PR-04 exit criteria
 
-Already satisfied:
+Satisfied:
 
 - [x] Samsung target device can bind and use the Shizuku clipboard bridge.
 - [x] Real clipboard content is captured and persisted.
 - [x] Capture disable/enable lifecycle behaves correctly.
+- [x] Vault lock/unlock path behaves correctly.
 - [x] Shizuku restart/recovery behaves correctly.
+- [x] Screen lock/unlock recovery behaves correctly.
+- [x] Doze/wake recovery behaves correctly.
+- [x] Oversized clipboard payloads are rejected on the real device.
 - [x] Samsung DeX clipboard capture works.
 - [x] Secure Folder behavior is classified as an expected profile-isolation limitation.
 
-Remaining before final closure:
+Non-blocking diagnostic follow-up:
 
-- [ ] Record screen lock -> unlock behavior.
-- [ ] Record doze/wake behavior.
-- [ ] Record real-device oversized-payload rejection.
-- [ ] Optional: expose or collect `READY_EVENT` / `READY_POLL` for the compatibility matrix.
+- [ ] Optional: expose or collect `READY_EVENT` / `READY_POLL` explicitly for future compatibility matrices.
 
 ## Decision
 
-No bridge-v3 blocker has been found on the tested Samsung Galaxy S23 Ultra / DeX path.
+PR-04 passes on the tested Samsung Galaxy S23 Ultra / DeX path. No bridge-v3 blocker was found in the defined real-device compatibility gate.
 
-PR-05 QuickPasteActivity may be prepared in parallel, but PR-04 should be marked fully closed only after the three remaining real-device gate checks above are recorded.
+The owner-profile bridge intentionally does not cross the Samsung Secure Folder profile boundary. This limitation does not block PR-05.
+
+PR-04 may be closed and development may proceed to PR-05 QuickPasteActivity.
