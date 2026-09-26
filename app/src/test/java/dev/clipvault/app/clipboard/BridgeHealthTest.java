@@ -60,6 +60,15 @@ public class BridgeHealthTest {
     }
 
     @Test
+    public void stateCodeDistinguishesEventAndPollModes() {
+        assertEquals("READY_EVENT", BridgeHealth.fromProbe(CAP_READ | CAP_EVENT_LISTENER, 0).stateCode());
+        assertEquals("READY_POLL:LISTENER_SIGNATURE_UNSUPPORTED",
+                BridgeHealth.fromProbe(CAP_READ, ClipboardBridgeProtocol.LISTENER_SIGNATURE_UNSUPPORTED).stateCode());
+        assertEquals("DEGRADED:BACKEND_NOT_SHELL",
+                BridgeHealth.degraded(ClipboardBridgeProtocol.BACKEND_NOT_SHELL).stateCode());
+    }
+
+    @Test
     public void preBindStatesHaveStableDiagnostics() {
         assertEquals("NO_SHIZUKU", BridgeHealth.of(BridgeHealth.State.NO_SHIZUKU).diagnosticCode());
         assertEquals("DEGRADED:BACKEND_NOT_SHELL",

@@ -714,6 +714,11 @@ private fun SettingsScreen(
                     // Sanitized bridge state identifier such as DEGRADED:BACKEND_NOT_SHELL.
                     else -> state.lastCaptureError
                 })
+            // Device validation records: bridge mode (event vs poll) and the Android build it ran on.
+            DiagnosticRow(stringResource(R.string.bridge_mode),
+                state.bridgeState.ifBlank { stringResource(R.string.none) })
+            DiagnosticRow(stringResource(R.string.android_build),
+                "${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT}) · ${android.os.Build.DISPLAY}")
             DiagnosticRow(stringResource(R.string.database), stringResource(R.string.encrypted_unlocked))
             DiagnosticRow(stringResource(R.string.network_permission), stringResource(R.string.not_present))
         }

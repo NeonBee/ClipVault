@@ -50,6 +50,7 @@ public final class ClipboardCaptureService extends Service {
                         .withError(error).diagnosticCode()));
         shizukuController = new ShizukuController(this, health -> {
             recordCaptureError(health.diagnosticCode());
+            recordBridgeState(health.stateCode());
             updateNotification();
         }, coordinator::accept);
         shizukuController.start();
@@ -89,6 +90,11 @@ public final class ClipboardCaptureService extends Service {
     private void recordCaptureError(String code) {
         getSharedPreferences(ClipVaultApp.PREFS, MODE_PRIVATE).edit()
                 .putString(ClipVaultApp.PREF_LAST_CAPTURE_ERROR, code).apply();
+    }
+
+    private void recordBridgeState(String code) {
+        getSharedPreferences(ClipVaultApp.PREFS, MODE_PRIVATE).edit()
+                .putString(ClipVaultApp.PREF_BRIDGE_STATE, code).apply();
     }
 
     private void pollPrivilegedClipboard() {
@@ -170,6 +176,8 @@ public final class ClipboardCaptureService extends Service {
         if (clipboardManager != null) clipboardManager.removePrimaryClipChangedListener(localListener);
         if (poller != null) poller.shutdownNow();
         if (shizukuController != null) shizukuController.close();
+        // A stopped service must not leave a stale READY_* mode in diagnostics.
+        recordBridgeState("");
         super.onDestroy();
     }
 

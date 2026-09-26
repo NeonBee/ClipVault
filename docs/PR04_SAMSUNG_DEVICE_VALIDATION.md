@@ -38,7 +38,35 @@ The code under test includes:
 | Screen lock / unlock | PASS | Capture behavior after screen lock/unlock matched the expected bridge lifecycle and recovered normally. |
 | Doze / wake | PASS | Capture recovered and continued normally after the device entered an idle/sleep state and woke. |
 | Oversized payload rejection (>128,000 UTF-16 chars) | PASS | The oversized clipboard payload was rejected as designed rather than persisted/truncated. |
-| READY_EVENT vs READY_POLL | NOT DIRECTLY OBSERVED | Current Settings UI only exposes Shizuku Ready/Offline; it does not display the healthy bridge subtype. Functional capture is confirmed, so this is non-blocking for PR-04. |
+| READY_EVENT vs READY_POLL | PENDING RECORD | The original session could not observe it because the Settings UI only showed Shizuku Ready/Offline. Diagnostics now show **Bridge mode**; the value is recorded below after re-collection on the device. Functional capture is confirmed, so this is non-blocking for PR-04. |
+
+## Device record
+
+Status: **PENDING** — the two values below were not recorded in the original session and must be
+collected from the same Galaxy S23 Ultra. They matter because the exact hidden-`IClipboard` signature
+table differs by API level (API 34+ uses the 4-argument `getPrimaryClip`), and the design's PR-04
+checklist separates the event listener from the polling fallback.
+
+Collect with the device connected over adb, the debug build installed and capture enabled:
+
+```sh
+scripts/device-validation-record.sh --run-test
+```
+
+The script prints a markdown table (model, Android/API, One UI, build, security patch, Shizuku server
+user, bridge mode, last sanitized error, real-device test result as PASS / SKIPPED / FAIL from the
+connected-test XML, so a run where every test was skipped by `Assume` is not reported as PASS). It
+reads no clipboard content.
+Replace this section's table with its output. For a release build, read **Bridge mode** and
+**Android build** from Settings > Diagnostics instead.
+
+| Item | Value |
+| --- | --- |
+| Model | Galaxy S23 Ultra |
+| Android (API) | PENDING |
+| One UI | PENDING |
+| Build | PENDING |
+| Bridge mode | PENDING (`READY_EVENT` expected when the listener signature resolves; `READY_POLL:<reason>` means polling fallback) |
 
 ## Secure Folder boundary
 
@@ -73,7 +101,9 @@ Satisfied:
 
 Non-blocking diagnostic follow-up:
 
-- [ ] Optional: expose or collect `READY_EVENT` / `READY_POLL` explicitly for future compatibility matrices.
+- [x] Expose `READY_EVENT` / `READY_POLL` explicitly: Settings > Diagnostics shows **Bridge mode** and **Android build**.
+- [ ] Record the Android / One UI version the validation ran on (see "Device record").
+- [ ] Record the observed bridge mode (see "Device record").
 
 ## Decision
 

@@ -164,6 +164,8 @@
     <string name="font_scale">Text size</string>
     <string name="last_successful_capture">Last successful capture</string>
     <string name="last_sanitized_error">Last sanitized error</string>
+    <string name="bridge_mode">Bridge mode</string>
+    <string name="android_build">Android build</string>
     <string name="never">Never</string>
     <string name="none">None</string>
     <string name="bridge_unavailable">Bridge unavailable</string>

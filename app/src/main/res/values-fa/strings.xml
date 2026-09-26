@@ -45,6 +45,8 @@
     <string name="font_scale">اندازه متن</string>
     <string name="last_successful_capture">آخرین ثبت موفق</string>
     <string name="last_sanitized_error">آخرین خطای سانسورشده</string>
+    <string name="bridge_mode">حالت پل</string>
+    <string name="android_build">نسخهٔ اندروید</string>
     <string name="never">هرگز</string>
     <string name="none">بدون خطا</string>
     <string name="bridge_unavailable">پل شیزوکو در دسترس نیست</string>
