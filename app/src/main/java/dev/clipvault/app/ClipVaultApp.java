@@ -19,6 +19,8 @@ import dev.clipvault.app.nativecore.TextAnalysis;
 import dev.clipvault.app.security.SecurePendingStore;
 import dev.clipvault.app.workers.RetentionWorker;
 
+import rikka.shizuku.ShizukuProvider;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -52,6 +54,14 @@ public final class ClipVaultApp extends Application {
     private SharedPreferences settings;
     private final CaptureRuleEngine ruleEngine = new CaptureRuleEngine();
     private AppContainer container;
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(base);
+        // Content providers start before onCreate(). Stop ShizukuProvider from auto-attaching Sui
+        // (a root backend); the clipboard bridge only accepts the ADB shell identity.
+        ShizukuProvider.disableAutomaticSuiInitialization();
+    }
 
     @Override
     public void onCreate() {
