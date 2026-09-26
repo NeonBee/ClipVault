@@ -50,6 +50,18 @@ public final class VaultAutoLock {
         }
     }
 
+    /**
+     * Main thread only. Called after an unlock completes. The database opens asynchronously after the
+     * biometric prompt, so every window may already have stopped (while the vault was still locked and
+     * the stop armed nothing); arm the timer now in that case.
+     */
+    public void onVaultUnlocked() {
+        if (startedActivities == 0 && unlocked.getAsBoolean()) {
+            scheduler.cancel(lockTask);
+            scheduler.schedule(lockTask, clampDelay(configuredDelayMs.getAsLong()));
+        }
+    }
+
     /** Main thread only. Called when the vault is locked by any path so a stale timer does not fire later. */
     public void onVaultLocked() {
         scheduler.cancel(lockTask);

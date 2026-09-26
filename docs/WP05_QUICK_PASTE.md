@@ -13,8 +13,8 @@ Terminology: `PR #N` is a GitHub Pull Request number; `WP-NN` is a design Work P
 | recent history | Empty query lists the newest 50 clips (pinned first, same order as the library). |
 | FTS search | `VaultRepository.query` with the existing prefix FTS5 query, 120 ms debounce, 50 results. |
 | arrow navigation | ↑/↓, PgUp/PgDn (5 rows), Ctrl+Home/End. Home/End without Ctrl stay in the text field. |
-| Enter select | Enter / numpad Enter / IME Go copies the selected row. Mouse: first click selects, second copies. On the lock pane Enter starts the unlock. |
-| Esc close | Esc and Back close the window. The window root takes focus on the lock/setup panes so Esc works there too. |
+| Enter select | Enter / numpad Enter / IME Go copies the selected row. Mouse: one click copies that row. On the lock pane Enter starts the unlock unless a focused button takes it (Enter on a focused Close closes). |
+| Esc close | Esc and Back close the window from every pane, whether the search field, a button or the window root has focus (handled in the parent-first preview phase). |
 | clipboard restore 후 `finish()` | `SensitiveClipboard.write` with `EXTRA_IS_SENSITIVE`, then `finishAndRemoveTask()`. |
 | search query persistence 없음 | Query and results live only in `QuickPasteViewModel`; no saved state, no preferences. Cleared on close, lock and when the window is hidden (hidden = closed). |
 | locked → biometric | Same `BiometricVaultUnlock` (BiometricPrompt + CryptoObject) as MainActivity; prompt opens automatically once. Cancel closes the window. No enrollment from QuickPaste. |
@@ -24,6 +24,8 @@ Terminology: `PR #N` is a GitHub Pull Request number; `WP-NN` is a design Work P
 Entry point: a dynamic launcher shortcut "Quick paste" (long-press the app icon, or the DeX taskbar icon). `QuickPasteActivity` is not exported. Notification action, Quick Settings entry and taskbar pinning are WP-06.
 
 Related fix: auto-lock and screen-off lock moved from `MainActivity` to `ClipVaultApp` (`VaultAutoLock`). Before this, opening QuickPaste over the main window armed MainActivity's timer and could lock the vault underneath QuickPaste, and a vault unlocked from QuickPaste alone would not auto-lock.
+
+Unlock race (review of PR #11): the database opens on the IO executor after the biometric prompt, so the window can stop while the vault is still locked. `openVault` therefore calls `VaultAutoLock.onVaultUnlocked()`, which arms the timer when no window is visible. Every `lockVault()` bumps a lock epoch; `BiometricVaultUnlock` captures it before the prompt and `openVault(key, epoch)` refuses (wiping the key) if a screen-off, keyguard or explicit lock happened in between, both before and after SQLCipher opens.
 
 ## Known behaviour
 

@@ -67,4 +67,5 @@
     <string name="quick_paste_empty">هنوز کلیپی نیست</string>
     <string name="quick_paste_no_match">کلیپی پیدا نشد</string>
     <string name="quick_paste_keys_hint">↑↓ انتخاب · Enter کپی · Esc بستن</string>
+    <string name="unlock_interrupted">خزانه هنگام باز شدن قفل شد. دوباره احراز هویت کنید.</string>
 </resources>

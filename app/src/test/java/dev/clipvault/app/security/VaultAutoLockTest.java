@@ -46,6 +46,39 @@ public class VaultAutoLockTest {
     }
 
     @Test
+    public void unlockCompletingAfterEveryWindowStoppedStillArmsTheTimer() {
+        // Review PR #11: biometric success, window stops while SQLCipher is still opening (vault locked
+        // at stop, nothing armed), then the asynchronous open completes.
+        unlocked.set(false);
+        autoLock.onActivityStarted();
+        autoLock.onActivityStopped(false);
+        assertFalse(scheduler.pending());
+
+        unlocked.set(true);
+        autoLock.onVaultUnlocked();
+        assertTrue(scheduler.pending());
+        assertEquals(30_000L, scheduler.delay);
+        scheduler.fire();
+        assertEquals(1, locks.get());
+    }
+
+    @Test
+    public void unlockCompletingWhileAWindowIsVisibleWaitsForItToStop() {
+        autoLock.onActivityStarted();
+        autoLock.onVaultUnlocked();
+        assertFalse(scheduler.pending());
+        autoLock.onActivityStopped(false);
+        assertTrue(scheduler.pending());
+    }
+
+    @Test
+    public void unlockHookDoesNothingIfTheVaultIsAlreadyLockedAgain() {
+        unlocked.set(false);
+        autoLock.onVaultUnlocked();
+        assertFalse(scheduler.pending());
+    }
+
+    @Test
     public void startingAnyWindowCancelsThePendingLock() {
         autoLock.onActivityStarted();
         autoLock.onActivityStopped(false);

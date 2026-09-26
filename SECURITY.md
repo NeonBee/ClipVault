@@ -26,7 +26,7 @@ There is intentionally no recovery key, server escrow or bypass. Losing or inval
 - Foreground notifications contain status only, never clipboard content.
 - Copied-back clips use `EXTRA_IS_SENSITIVE` where supported.
 - Vault lock drops repository access immediately and closes SQLCipher on the serialized I/O executor.
-- Screen-off/background timeout and explicit notification lock are supported. The background timeout starts only when no ClipVault window is visible and covers vaults unlocked from QuickPaste.
+- Screen-off/background timeout and explicit notification lock are supported. The background timeout starts only when no ClipVault window is visible, covers vaults unlocked from QuickPaste, and is armed when an unlock completes after the window was already hidden. A lock during an unlock invalidates it (lock epoch), so a late database open cannot reopen the vault.
 - Likely OTP, password/token phrases and payment numbers are skipped by default.
 
 ## Shizuku boundary

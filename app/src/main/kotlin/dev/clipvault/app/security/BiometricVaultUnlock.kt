@@ -49,6 +49,8 @@ class BiometricVaultUnlock(
             listener.onNotProvisioned()
             return
         }
+        // Screen-off / keyguard / explicit lock after this point invalidates the attempt (see openVault).
+        val epoch = app.lockEpoch()
         try {
             val cipher = if (enrolling) keyManager.createEnrollmentCipher() else keyManager.createUnlockCipher()
             val prompt = BiometricPrompt(activity, ContextCompat.getMainExecutor(activity),
@@ -59,7 +61,7 @@ class BiometricVaultUnlock(
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         val authenticated = result.cryptoObject?.cipher
                         if (authenticated == null) listener.onFailure(activity.getString(R.string.crypto_object_missing))
-                        else openVault(authenticated, enrolling)
+                        else openVault(authenticated, enrolling, epoch)
                     }
                 })
             val info = BiometricPrompt.PromptInfo.Builder()
@@ -77,15 +79,18 @@ class BiometricVaultUnlock(
         }
     }
 
-    private fun openVault(cipher: Cipher, enrollment: Boolean) {
+    private fun openVault(cipher: Cipher, enrollment: Boolean, epoch: Long) {
         listener.onOpening()
         app.io().execute {
             var databaseKey: ByteArray? = null
             try {
                 databaseKey = if (enrollment) keyManager.finishEnrollment(cipher) else keyManager.finishUnlock(cipher)
-                val imported = app.openVault(databaseKey)
+                val imported = app.openVault(databaseKey, epoch)
                 databaseKey = null
                 activity.runOnUiThread { listener.onOpened(imported) }
+            } catch (_: ClipVaultApp.UnlockInterruptedException) {
+                databaseKey?.fill(0)
+                activity.runOnUiThread { listener.onFailure(activity.getString(R.string.unlock_interrupted)) }
             } catch (error: GeneralSecurityException) {
                 databaseKey?.fill(0)
                 activity.runOnUiThread { listener.onFailure(error.message ?: activity.getString(R.string.unlock_failed)) }

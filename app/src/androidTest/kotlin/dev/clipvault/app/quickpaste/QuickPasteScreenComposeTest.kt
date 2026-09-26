@@ -80,13 +80,12 @@ class QuickPasteScreenComposeTest {
         assertNull(confirmed)
     }
 
-    @Test fun pointerClickSelectsThenCopiesTheSelectedRow() {
+    @Test fun pointerClickCopiesThatRowIncludingTheInitiallySelectedOne() {
         show(QuickPasteState(gate = QuickPasteGate.READY, results = clips, searched = true))
         compose.onNodeWithTag(QuickPasteTags.row(2)).performClick()
-        compose.onNodeWithTag(QuickPasteTags.row(2)).assertIsSelected()
-        assertNull(confirmed)
-        compose.onNodeWithTag(QuickPasteTags.row(2)).performClick()
         assertEquals(3L, confirmed?.id)
+        compose.onNodeWithTag(QuickPasteTags.row(0)).performClick()
+        assertEquals(1L, confirmed?.id)
     }
 
     @Test fun emptyVaultAndNoMatchAreDistinguished() {
@@ -115,6 +114,31 @@ class QuickPasteScreenComposeTest {
         assertNull(confirmed)
         root.performKeyInput { pressKey(Key.Escape) }
         assertEquals(1, closed)
+    }
+
+    @Test fun escClosesAndEnterActivatesTheButtonWhenAButtonHasKeyboardFocus() {
+        // Review PR #11: Esc must close even when the Unlock/Close button holds focus.
+        show(QuickPasteState(gate = QuickPasteGate.LOCKED))
+        compose.onNodeWithTag(QuickPasteTags.ROOT).assertIsFocused()
+        // Tab switches Compose to keyboard input mode and moves focus into the pane's buttons.
+        compose.onNodeWithTag(QuickPasteTags.ROOT).performKeyInput { pressKey(Key.Tab) }
+        val closeButton = compose.onNodeWithText(context.getString(R.string.quick_paste_close))
+        closeButton.assertIsFocused()
+
+        closeButton.performKeyInput { pressKey(Key.Escape) }
+        assertEquals(1, closed)
+
+        // Enter belongs to the focused button (Close), not to the root's unlock shortcut.
+        closeButton.performKeyInput { pressKey(Key.Enter) }
+        assertEquals(2, closed)
+        assertEquals(0, unlocks)
+
+        compose.onNodeWithTag(QuickPasteTags.ROOT).performKeyInput { pressKey(Key.Tab) }
+        val unlockButton = compose.onNodeWithText(context.getString(R.string.unlock_vault))
+        unlockButton.assertIsFocused()
+        unlockButton.performKeyInput { pressKey(Key.Escape) }
+        assertEquals(3, closed)
+        assertEquals(0, unlocks)
     }
 
     @Test fun setupRequiredSendsTheUserToTheMainApp() {

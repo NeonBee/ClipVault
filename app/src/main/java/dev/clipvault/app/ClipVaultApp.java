@@ -36,6 +36,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.security.GeneralSecurityException;
 
 public final class ClipVaultApp extends Application {
@@ -68,6 +69,8 @@ public final class ClipVaultApp extends Application {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<Runnable> lockListeners = new CopyOnWriteArrayList<>();
     private VaultAutoLock autoLock;
+    /** Incremented by every lockVault(); an unlock that started in an older epoch must not open the vault. */
+    private final AtomicLong lockEpoch = new AtomicLong();
 
     @Override
     protected void attachBaseContext(Context base) {
@@ -159,16 +162,40 @@ public final class ClipVaultApp extends Application {
         return unlocked ? repository : null;
     }
 
+    /** Capture before starting an unlock and pass to {@link #openVault(byte[], long)}. */
+    public long lockEpoch() {
+        return lockEpoch.get();
+    }
+
     public int openVault(@NonNull byte[] databaseKey) {
+        return openVault(databaseKey, lockEpoch.get());
+    }
+
+    /**
+     * Opens the vault unless it was locked (screen off, keyguard, explicit lock) after the unlock that
+     * produced this key began. Call on the IO executor.
+     *
+     * @throws UnlockInterruptedException when the lock epoch changed; the key is wiped and nothing stays open
+     */
+    public int openVault(@NonNull byte[] databaseKey, long expectedLockEpoch) {
         if (Thread.currentThread() == android.os.Looper.getMainLooper().getThread()) {
             throw new IllegalStateException("Database must be opened off the main thread");
         }
         try {
+            if (lockEpoch.get() != expectedLockEpoch) throw new UnlockInterruptedException();
             VaultRepository opened = new VaultRepository(this, databaseKey);
-            VaultRepository old = repository;
-            repository = opened;
-            unlocked = true;
-            if (old != null) old.close();
+            synchronized (lockEpoch) {
+                // lockVault() may have run while SQLCipher was opening; do not publish a stale unlock.
+                if (lockEpoch.get() != expectedLockEpoch) {
+                    opened.close();
+                    throw new UnlockInterruptedException();
+                }
+                VaultRepository old = repository;
+                repository = opened;
+                unlocked = true;
+                if (old != null) old.close();
+            }
+            mainHandler.post(() -> { if (autoLock != null) autoLock.onVaultUnlocked(); });
 
             ruleEngine.replace(opened.rules());
 
@@ -211,7 +238,10 @@ public final class ClipVaultApp extends Application {
 
     /** Idempotent; any thread. Lock listeners always run so every window drops decrypted state. */
     public void lockVault() {
-        unlocked = false;
+        synchronized (lockEpoch) {
+            lockEpoch.incrementAndGet();
+            unlocked = false;
+        }
         ioExecutor.execute(() -> {
             VaultRepository closing = repository;
             repository = null;
@@ -245,6 +275,13 @@ public final class ClipVaultApp extends Application {
         ruleEngine.replace(java.util.Collections.emptyList());
         settings.edit().putBoolean(PREF_CAPTURE_ENABLED, false)
                 .putBoolean(PREF_MAINTENANCE_PENDING, false).apply();
+    }
+
+    /** The vault was locked while this unlock was in progress; the user must authenticate again. */
+    public static final class UnlockInterruptedException extends IllegalStateException {
+        public UnlockInterruptedException() {
+            super("The vault was locked while unlocking");
+        }
     }
 
     public void capture(@NonNull String rawText, long createdAt) {

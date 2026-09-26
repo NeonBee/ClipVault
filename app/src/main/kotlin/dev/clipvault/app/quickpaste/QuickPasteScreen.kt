@@ -44,6 +44,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.nativeKeyCode
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -85,19 +86,26 @@ fun QuickPasteScreen(
         Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
             Column(
                 Modifier.widthIn(max = 640.dp).fillMaxSize().padding(16.dp)
+                    // Preview runs parent-first, before the focused field or button: Esc always closes,
+                    // and on the search pane arrows/Enter drive the list instead of the text field.
                     .onPreviewKeyEvent { event ->
                         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                         val action = QuickPasteKeys.action(event.key.nativeKeyCode, event.isCtrlPressed)
                             ?: return@onPreviewKeyEvent false
-                        when (action) {
-                            QuickPasteKeyAction.CLOSE -> onClose()
-                            QuickPasteKeyAction.CONFIRM -> when (state.gate) {
-                                QuickPasteGate.READY -> onConfirm()
-                                QuickPasteGate.LOCKED -> onUnlock()
-                                else -> return@onPreviewKeyEvent false
-                            }
-                            else -> if (state.gate == QuickPasteGate.READY) onKey(action) else return@onPreviewKeyEvent false
+                        when {
+                            action == QuickPasteKeyAction.CLOSE -> onClose()
+                            state.gate != QuickPasteGate.READY -> return@onPreviewKeyEvent false
+                            action == QuickPasteKeyAction.CONFIRM -> onConfirm()
+                            else -> onKey(action)
                         }
+                        true
+                    }
+                    // Bubble phase: on the lock pane a focused button handles its own Enter; only an
+                    // Enter nobody consumed (root focused) starts the unlock.
+                    .onKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown || state.gate != QuickPasteGate.LOCKED) return@onKeyEvent false
+                        if (QuickPasteKeys.action(event.key.nativeKeyCode) != QuickPasteKeyAction.CONFIRM) return@onKeyEvent false
+                        onUnlock()
                         true
                     }
                     .focusRequester(rootFocus)
@@ -167,8 +175,9 @@ private fun ColumnScope.SearchPane(
         verticalArrangement = Arrangement.spacedBy(4.dp)) {
         itemsIndexed(state.results, key = { _, item -> item.id }) { index, item ->
             ResultRow(item, index == state.selected, Modifier.testTag(QuickPasteTags.row(index))) {
-                // Pointer: first click selects, a click on the selected row copies (keyboard users press Enter).
-                if (index == state.selected) onConfirm() else onSelectIndex(index)
+                // Pointer: one click copies that row, like Enter on a keyboard selection.
+                onSelectIndex(index)
+                onConfirm()
             }
         }
     }

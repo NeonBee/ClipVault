@@ -186,4 +186,5 @@
     <string name="quick_paste_empty">No clips yet</string>
     <string name="quick_paste_no_match">No matching clips</string>
     <string name="quick_paste_keys_hint">↑↓ select · Enter copy · Esc close</string>
+    <string name="unlock_interrupted">The vault was locked while unlocking. Authenticate again.</string>
 </resources>
