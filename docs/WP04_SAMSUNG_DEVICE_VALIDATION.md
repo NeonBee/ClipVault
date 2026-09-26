@@ -49,11 +49,16 @@ collected from the same Galaxy S23 Ultra. They matter because the exact hidden-`
 table differs by API level (API 34+ uses the 4-argument `getPrimaryClip`), and the design's WP-04
 checklist separates the event listener from the polling fallback.
 
-Collect with the device connected over adb, the debug build installed and capture enabled:
+Collect on Windows from the repository root, with the device connected over adb (USB or wireless
+debugging), the debug build installed and capture enabled:
 
-```sh
-scripts/device-validation-record.sh --run-test
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1 -RunTest -OutFile wp04-device-record.md
 ```
+
+The script runs on Windows PowerShell 5.1 and PowerShell 7. It finds `adb` on `PATH`, then under
+`ANDROID_HOME`, `ANDROID_SDK_ROOT` or `%LOCALAPPDATA%\Android\Sdk`. `-RunTest` uses `gradlew.bat` and needs
+`JAVA_HOME` (JDK 17+). Without `-RunTest` it only reads device properties and the bridge mode.
 
 The script prints a markdown table (model, Android/API, One UI, build, security patch, Shizuku server
 user, bridge mode, last sanitized error, real-device test result as PASS / SKIPPED / FAIL from the
