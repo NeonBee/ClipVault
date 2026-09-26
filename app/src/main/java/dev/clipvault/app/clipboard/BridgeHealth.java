@@ -66,6 +66,16 @@ public final class BridgeHealth {
         return state == State.READY_EVENT;
     }
 
+    /**
+     * Current bridge mode for diagnostics and device validation records, e.g. READY_EVENT,
+     * READY_POLL or DEGRADED:BACKEND_NOT_SHELL. Never contains clipboard data.
+     */
+    @NonNull
+    public String stateCode() {
+        return errorCode == ClipboardBridgeProtocol.OK
+                ? state.name() : state.name() + ":" + ClipboardBridgeProtocol.errorName(errorCode);
+    }
+
     /** Sanitized identifier for diagnostics: empty when healthy, never clipboard data. */
     @NonNull
     public String diagnosticCode() {

@@ -40,6 +40,8 @@ public final class ClipVaultApp extends Application {
     public static final String PREF_MAINTENANCE_PENDING = "maintenance_pending";
     public static final String PREF_LAST_CAPTURE_AT = "last_capture_at";
     public static final String PREF_LAST_CAPTURE_ERROR = "last_capture_error";
+    /** BridgeHealth.stateCode() of the running capture service; empty when it is stopped. */
+    public static final String PREF_BRIDGE_STATE = "bridge_state";
     public static final String PREF_AUTO_LOCK_MS = "auto_lock_ms";
 
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(runnable -> {

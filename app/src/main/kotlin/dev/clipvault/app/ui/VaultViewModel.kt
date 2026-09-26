@@ -80,6 +80,7 @@ data class VaultUiState(
     val pendingCount: Int = 0,
     val lastCaptureAt: Long = 0,
     val lastCaptureError: String = "",
+    val bridgeState: String = "",
     val autoLockMs: Long = 30_000,
 )
 
@@ -326,11 +327,12 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                 val pending = app.pending().count()
                 val lastCapture = app.settings().getLong(ClipVaultApp.PREF_LAST_CAPTURE_AT, 0L)
                 val captureError = app.settings().getString(ClipVaultApp.PREF_LAST_CAPTURE_ERROR, "").orEmpty()
+                val bridgeState = app.settings().getString(ClipVaultApp.PREF_BRIDGE_STATE, "").orEmpty()
                 val autoLock = app.settings().getLong(ClipVaultApp.PREF_AUTO_LOCK_MS, 30_000L)
                 mutableState.update {
                     it.copy(stats = nextStats, collections = nextCollections, tags = nextTags,
                         rules = nextRules, pendingCount = pending, lastCaptureAt = lastCapture,
-                        lastCaptureError = captureError, autoLockMs = autoLock)
+                        lastCaptureError = captureError, bridgeState = bridgeState, autoLockMs = autoLock)
                 }
             } catch (error: RuntimeException) {
                 mutableState.update { it.copy(error = error.message ?: "Could not read the vault") }

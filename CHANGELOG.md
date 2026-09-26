@@ -8,6 +8,7 @@
 - Replaced the Shizuku bridge with protocol v3: shell-UID-only backend with Sui auto-init disabled, per-user UserService tags and single-caller binding, exact AOSP signature adapters for `getPrimaryClip` and `addPrimaryClipChangedListener`, capability probe, structured error codes, a `BridgeHealth` state machine shown in diagnostics and the notification, and a 128,000-char payload limit that rejects instead of truncating.
 - Marked `gradlew` executable in git so CI `./gradlew` steps no longer fail with exit code 126.
 - Moved CI to `android-actions/setup-android@v4` with SDK packages passed as action input; v3 failed on current runners installing the removed `tools` package. Enabled KVM for the emulator job so instrumentation tests no longer run on a software-only emulator.
+- Added Settings > Diagnostics rows for bridge mode (`READY_EVENT` / `READY_POLL` / `DEGRADED:<reason>`) and Android build, plus `scripts/device-validation-record.sh` to collect device validation records without reading clipboard content.
 
 ## 2.0.0
 
