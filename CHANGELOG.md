@@ -3,7 +3,7 @@
 ## Unreleased (DeX fork hardening)
 
 - Pinned the audit baseline at upstream `ee1f24af3010dd26be7d95545ea9dbf0fd703622` (ClipVault 2.0.0).
-- Updated SQLCipher Android from 4.17.0 to 4.19.0 stable.
+- Updated SQLCipher Android from 4.17.0 to 4.19.0 stable and AndroidX SQLite from 2.6.2 to 2.7.1, matching the SQLCipher 4.19 integration guide (2.7.0+).
 - Marked `gradlew` executable in git so CI `./gradlew` steps no longer fail with exit code 126.
 
 ## 2.0.0
