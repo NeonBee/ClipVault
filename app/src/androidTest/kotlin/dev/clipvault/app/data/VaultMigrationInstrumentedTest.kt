@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import net.zetetic.database.sqlcipher.SQLiteDatabase
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,6 +30,7 @@ class VaultMigrationInstrumentedTest {
             val item = repository.query(ClipQuery.builder().build()).items.single()
             assertEquals("legacy", item.content)
             assertEquals(1000L, item.lastCapturedAt)
+            assertTrue(repository.isFtsSecureDeleteEnabled)
         }
     }
 }

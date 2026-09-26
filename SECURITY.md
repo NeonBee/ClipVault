@@ -14,7 +14,7 @@ There is intentionally no recovery key, server escrow or bypass. Losing or inval
 
 ## Storage
 
-- Main vault: SQLCipher, `cipher_memory_security=ON`, `secure_delete=ON`, foreign keys and encrypted FTS5.
+- Main vault: SQLCipher, `cipher_memory_security=ON`, `secure_delete=ON`, foreign keys and encrypted FTS5 with FTS5 `secure-delete` (schema v3), so permanently deleted clips leave no terms in the FTS shadow tables.
 - Locked-state staging: a separate SQLite database whose payloads are individually encrypted with AES-256-GCM; deduplication uses an independent Keystore HMAC key.
 - Local backup: Argon2id (64 MiB, 3 iterations, parallelism 1) derives an AES-256-GCM file key. The header is authenticated as AAD.
 - Android backup and device transfer: disabled through manifest and extraction rules.

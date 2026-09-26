@@ -28,7 +28,7 @@ flowchart LR
     S --> F[Foreground capture service]
     F --> A[C++ text analysis]
     A --> L{Vault unlocked?}
-    L -->|yes| D[SQLCipher schema v2 + FTS5]
+    L -->|yes| D[SQLCipher schema v3 + FTS5 secure-delete]
     L -->|no| P[AES-GCM staging]
     B[BiometricPrompt + CryptoObject] --> K[Android Keystore unwrap]
     K --> D

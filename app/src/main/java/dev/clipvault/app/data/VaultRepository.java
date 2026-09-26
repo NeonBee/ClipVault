@@ -27,12 +27,16 @@ import java.util.Locale;
 
 /** Thread-safe encrypted persistence boundary. All public operations are synchronous. */
 public final class VaultRepository implements AutoCloseable {
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
     private static final String CLIP_COLUMNS =
             "c.id,c.content,c.title,c.note,c.domain,c.first_captured_at,c.last_captured_at," +
             "c.capture_count,c.char_count,c.flags,c.favorite,c.pinned,c.collection_id,c.deleted_at";
 
+    private static final int WAL_CHECKPOINT_ATTEMPTS = 3;
+    private static final long WAL_CHECKPOINT_RETRY_MS = 20L;
+
     private SQLiteDatabase database;
+    private boolean walTruncatePending;
 
     public VaultRepository(@NonNull Context context, @NonNull byte[] databaseKey) {
         if (databaseKey.length != 32) throw new IllegalArgumentException("Database key must be 256 bits");
@@ -60,11 +64,87 @@ public final class VaultRepository implements AutoCloseable {
             if (version < 2) {
                 createOrganizationSchema();
                 createSearchSchema();
-                database.execSQL("PRAGMA user_version = 2");
+            }
+            if (version < 3) {
+                enableFtsSecureDelete();
+                // v2 index may still hold terms of clips deleted before secure-delete existed.
+                if (version == 2) rebuildSearchIndex();
+                database.execSQL("PRAGMA user_version = 3");
             }
             database.setTransactionSuccessful();
         } finally {
             database.endTransaction();
+        }
+        if (version == 2) checkpointAndTruncateWal();
+    }
+
+    /**
+     * PRAGMA secure_delete does not cover FTS5 shadow tables: a plain FTS5 delete only appends a
+     * tombstone and keeps the original terms until a segment merge. This persistent FTS5 option
+     * removes the terms immediately. Requires SQLite 3.42+, bundled by SQLCipher 4.19.
+     */
+    private void enableFtsSecureDelete() {
+        database.execSQL("INSERT INTO clips_fts(clips_fts,rank) VALUES('secure-delete',1)");
+    }
+
+    /** Drops every FTS5 segment and re-indexes live rows; freed pages are zeroed by secure_delete. */
+    private void rebuildSearchIndex() {
+        database.execSQL("INSERT INTO clips_fts(clips_fts) VALUES('rebuild')");
+    }
+
+    /**
+     * Moves rewritten pages into the main file and empties the WAL, so page images that still hold
+     * deleted plaintext do not linger in {@code clipvault.db-wal} until it wraps. Runs outside any
+     * transaction after hard deletes, edits and the v2 → v3 migration.
+     */
+    private void checkpointAndTruncateWal() {
+        secureCheckpoint();
+    }
+
+    /**
+     * Security checkpoint: {@code PRAGMA wal_checkpoint(TRUNCATE)} and check its busy column.
+     * Inside a transaction the checkpoint cannot complete, so it is deferred to the end of
+     * {@link #runInTransaction} (or {@link #close}). A busy result is retried a few times and
+     * otherwise left pending for the next opportunity; {@link #isWalTruncatePending()} exposes it.
+     *
+     * @return true when the WAL was fully checkpointed and truncated now
+     */
+    public synchronized boolean secureCheckpoint() {
+        ensureOpen();
+        if (database.inTransaction()) {
+            walTruncatePending = true;
+            return false;
+        }
+        for (int attempt = 0; attempt < WAL_CHECKPOINT_ATTEMPTS; attempt++) {
+            try (Cursor cursor = database.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", new String[0])) {
+                // Columns: busy, WAL frames, checkpointed frames. busy=0 means TRUNCATE completed.
+                if (cursor.moveToFirst() && cursor.getInt(0) == 0) {
+                    walTruncatePending = false;
+                    return true;
+                }
+            }
+            try {
+                Thread.sleep(WAL_CHECKPOINT_RETRY_MS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        walTruncatePending = true;
+        return false;
+    }
+
+    /** True while deleted page images may still be in the WAL because a checkpoint was deferred or busy. */
+    public synchronized boolean isWalTruncatePending() {
+        return walTruncatePending;
+    }
+
+    /** Exposed for security instrumentation tests; reports the persistent FTS5 option. */
+    public synchronized boolean isFtsSecureDeleteEnabled() {
+        ensureOpen();
+        try (Cursor cursor = database.rawQuery(
+                "SELECT v FROM clips_fts_config WHERE k='secure-delete'", new String[0])) {
+            return cursor.moveToFirst() && cursor.getInt(0) == 1;
         }
     }
 
@@ -377,10 +457,12 @@ public final class VaultRepository implements AutoCloseable {
                 database.update("clips", values, "id=?", new String[]{String.valueOf(id)});
             }
             database.setTransactionSuccessful();
-            return true;
         } finally {
             database.endTransaction();
         }
+        // Old content and FTS pages of the edited or merged clip must not linger in the WAL.
+        checkpointAndTruncateWal();
+        return true;
     }
 
     /** 1.x API now performs recoverable deletion. */
@@ -434,6 +516,7 @@ public final class VaultRepository implements AutoCloseable {
         } finally {
             database.endTransaction();
         }
+        if (changed > 0) checkpointAndTruncateWal();
         return changed;
     }
 
@@ -452,7 +535,9 @@ public final class VaultRepository implements AutoCloseable {
 
     public synchronized int purgeTrashOlderThan(long cutoff) {
         ensureOpen();
-        return database.delete("clips", "deleted_at IS NOT NULL AND deleted_at<?", new String[]{String.valueOf(cutoff)});
+        int purged = database.delete("clips", "deleted_at IS NOT NULL AND deleted_at<?", new String[]{String.valueOf(cutoff)});
+        if (purged > 0) checkpointAndTruncateWal();
+        return purged;
     }
 
     public synchronized long createCollection(@NonNull String name, @NonNull String colorKey) {
@@ -623,6 +708,7 @@ public final class VaultRepository implements AutoCloseable {
         } finally {
             database.endTransaction();
         }
+        if (walTruncatePending && !database.inTransaction()) secureCheckpoint();
     }
 
     public synchronized void clearForRestore() {
@@ -632,6 +718,8 @@ public final class VaultRepository implements AutoCloseable {
         database.delete("tags", null, null);
         database.delete("collections", null, null);
         database.delete("capture_rules", null, null);
+        // Usually runs inside the restore transaction: deferred until runInTransaction commits.
+        secureCheckpoint();
     }
 
     public synchronized long mergeImportedClip(@NonNull BackupClipData clip) {
@@ -665,6 +753,7 @@ public final class VaultRepository implements AutoCloseable {
     @Override
     public synchronized void close() {
         if (database != null) {
+            if (walTruncatePending && database.isOpen() && !database.inTransaction()) secureCheckpoint();
             database.close();
             database = null;
         }
