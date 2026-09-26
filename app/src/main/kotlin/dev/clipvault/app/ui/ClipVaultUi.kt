@@ -135,6 +135,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -788,8 +789,14 @@ private fun RuleRow(rule: CaptureRule, onEnabled: (Boolean) -> Unit, onDelete: (
 }
 
 @Composable
-private fun DiagnosticRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth()) { Text(label, Modifier.weight(1f)); Text(value, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold) }
+internal fun DiagnosticRow(label: String, value: String) {
+    // Both cells are weighted. An unweighted value is measured first and takes the whole width, so a
+    // long value such as the Android build squeezed the label to a few dp, one character per line.
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(label, Modifier.weight(0.45f))
+        Text(value, Modifier.weight(0.55f), color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
