@@ -3,7 +3,11 @@ package dev.clipvault.app.quickpaste
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -16,6 +20,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.clipvault.app.R
 import dev.clipvault.app.data.ClipItem
@@ -24,7 +29,7 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
-@OptIn(ExperimentalTestApi::class)
+@OptIn(ExperimentalTestApi::class, ExperimentalComposeUiApi::class)
 class QuickPasteScreenComposeTest {
     @get:Rule val compose = createComposeRule()
 
@@ -38,9 +43,12 @@ class QuickPasteScreenComposeTest {
     private var unlocks = 0
     private var openApp = 0
 
+    private var inputModeManager: InputModeManager? = null
+
     private fun show(initial: QuickPasteState) {
         state = initial
         compose.setContent {
+            inputModeManager = LocalInputModeManager.current
             QuickPasteScreen(
                 state = state,
                 onQueryChange = { queries += it; state = state.copy(query = it) },
@@ -120,9 +128,9 @@ class QuickPasteScreenComposeTest {
         // Review PR #11: Esc must close even when the Unlock/Close button holds focus.
         show(QuickPasteState(gate = QuickPasteGate.LOCKED))
         compose.onNodeWithTag(QuickPasteTags.ROOT).assertIsFocused()
-        // Tab switches Compose to keyboard input mode and moves focus into the pane's buttons.
-        compose.onNodeWithTag(QuickPasteTags.ROOT).performKeyInput { pressKey(Key.Tab) }
-        val closeButton = compose.onNodeWithText(context.getString(R.string.quick_paste_close))
+        // With a hardware keyboard Compose is in keyboard input mode, where buttons are focusable.
+        compose.runOnIdle { inputModeManager!!.requestInputMode(InputMode.Keyboard) }
+        val closeButton = compose.onNodeWithText(context.getString(R.string.quick_paste_close)).requestFocus()
         closeButton.assertIsFocused()
 
         closeButton.performKeyInput { pressKey(Key.Escape) }
@@ -133,8 +141,7 @@ class QuickPasteScreenComposeTest {
         assertEquals(2, closed)
         assertEquals(0, unlocks)
 
-        compose.onNodeWithTag(QuickPasteTags.ROOT).performKeyInput { pressKey(Key.Tab) }
-        val unlockButton = compose.onNodeWithText(context.getString(R.string.unlock_vault))
+        val unlockButton = compose.onNodeWithText(context.getString(R.string.unlock_vault)).requestFocus()
         unlockButton.assertIsFocused()
         unlockButton.performKeyInput { pressKey(Key.Escape) }
         assertEquals(3, closed)
