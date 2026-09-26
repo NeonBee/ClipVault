@@ -6,7 +6,7 @@ ClipVault uses one Android application module with explicit boundaries instead o
 
 - **Compose presentation:** a single `MainActivity`, Navigation Compose destinations, `VaultViewModel`, StateFlow and Paging 3.
 - **Application container:** owns UI settings and the encrypted backup manager. Database ownership remains in `ClipVaultApp` so lock transitions can close SQLCipher deterministically.
-- **Encrypted persistence:** `VaultRepository` is the synchronized SQLCipher boundary. Schema v2 contains clips, collections, tags, links, capture rules and an FTS5 index.
+- **Encrypted persistence:** `VaultRepository` is the synchronized SQLCipher boundary. Schema v3 contains clips, collections, tags, links, capture rules and an FTS5 index with the persistent FTS5 `secure-delete` option. The v2 → v3 migration enables it, rebuilds the index and truncates the WAL so terms of clips deleted under v2 are purged.
 - **Locked-state ingress:** `SecurePendingStore` uses a separate non-exportable Keystore AES key and HMAC lookup key. It can accept clipboard text while the biometric database key is absent.
 - **Capture bridge:** a foreground service talks to a clipboard-only Shizuku UserService over AIDL v2. The bridge exposes read and listener operations only; it cannot execute arbitrary shell commands.
 - **Native analysis:** one JNI call returns normalized content, flags, sensitivity, canonical URL and domain. The Java fallback preserves capture if the native library cannot load.

@@ -4,6 +4,7 @@
 
 - Pinned the audit baseline at upstream `ee1f24af3010dd26be7d95545ea9dbf0fd703622` (ClipVault 2.0.0).
 - Updated SQLCipher Android from 4.17.0 to 4.19.0 stable.
+- Moved the vault to schema v3: FTS5 `secure-delete` is enabled, v2 indexes are rebuilt and the WAL is truncated so deleted clips leave no terms in FTS shadow tables. Added forensic deletion instrumentation tests.
 - Marked `gradlew` executable in git so CI `./gradlew` steps no longer fail with exit code 126.
 
 ## 2.0.0

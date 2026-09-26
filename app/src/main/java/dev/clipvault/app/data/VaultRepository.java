@@ -27,7 +27,7 @@ import java.util.Locale;
 
 /** Thread-safe encrypted persistence boundary. All public operations are synchronous. */
 public final class VaultRepository implements AutoCloseable {
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
     private static final String CLIP_COLUMNS =
             "c.id,c.content,c.title,c.note,c.domain,c.first_captured_at,c.last_captured_at," +
             "c.capture_count,c.char_count,c.flags,c.favorite,c.pinned,c.collection_id,c.deleted_at";
@@ -60,11 +60,47 @@ public final class VaultRepository implements AutoCloseable {
             if (version < 2) {
                 createOrganizationSchema();
                 createSearchSchema();
-                database.execSQL("PRAGMA user_version = 2");
+            }
+            if (version < 3) {
+                enableFtsSecureDelete();
+                // v2 index may still hold terms of clips deleted before secure-delete existed.
+                if (version == 2) rebuildSearchIndex();
+                database.execSQL("PRAGMA user_version = 3");
             }
             database.setTransactionSuccessful();
         } finally {
             database.endTransaction();
+        }
+        if (version == 2) checkpointAndTruncateWal();
+    }
+
+    /**
+     * PRAGMA secure_delete does not cover FTS5 shadow tables: a plain FTS5 delete only appends a
+     * tombstone and keeps the original terms until a segment merge. This persistent FTS5 option
+     * removes the terms immediately. Requires SQLite 3.42+, bundled by SQLCipher 4.19.
+     */
+    private void enableFtsSecureDelete() {
+        database.execSQL("INSERT INTO clips_fts(clips_fts,rank) VALUES('secure-delete',1)");
+    }
+
+    /** Drops every FTS5 segment and re-indexes live rows; freed pages are zeroed by secure_delete. */
+    private void rebuildSearchIndex() {
+        database.execSQL("INSERT INTO clips_fts(clips_fts) VALUES('rebuild')");
+    }
+
+    /** Moves the rewritten pages into the main file so stale page images do not linger in the WAL. */
+    private void checkpointAndTruncateWal() {
+        try (Cursor cursor = database.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", new String[0])) {
+            cursor.moveToFirst();
+        }
+    }
+
+    /** Exposed for security instrumentation tests; reports the persistent FTS5 option. */
+    public synchronized boolean isFtsSecureDeleteEnabled() {
+        ensureOpen();
+        try (Cursor cursor = database.rawQuery(
+                "SELECT v FROM clips_fts_config WHERE k='secure-delete'", new String[0])) {
+            return cursor.moveToFirst() && cursor.getInt(0) == 1;
         }
     }
 
