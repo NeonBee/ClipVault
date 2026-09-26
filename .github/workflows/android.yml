@@ -53,6 +53,13 @@ jobs:
       - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;27.2.12479018 cmake;3.22.1
+      # Without this the runner reports "hardware acceleration is not available" and the emulator
+      # runs in software, which times out the Compose tests' 5 s io-executor teardown.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: Encrypted migration, backup, native and Compose tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
