@@ -13,7 +13,10 @@ import org.junit.runner.RunWith
 
 /**
  * Forensic deletion checks for the FTS5 index. The marker must disappear from the decrypted
- * `clips_fts_data` shadow table, not only from MATCH results.
+ * `clips_fts_data` / `clips_fts_idx` shadow tables, not only from MATCH results. Markers use a
+ * prefix no filler term shares, so a leftover would be stored in full rather than prefix-compressed.
+ * WAL frames are not inspected here: close() checkpoints them; VaultRepository also truncates the
+ * WAL after every hard delete.
  */
 @RunWith(AndroidJUnit4::class)
 class VaultDeletionHardeningInstrumentedTest {
@@ -114,10 +117,13 @@ class VaultDeletionHardeningInstrumentedTest {
     private fun shadowRowsContaining(db: SQLiteDatabase, term: String): Int {
         val needle = term.toByteArray(Charsets.UTF_8)
         var hits = 0
-        db.rawQuery("SELECT block FROM clips_fts_data", arrayOf()).use { cursor ->
-            while (cursor.moveToNext()) {
-                val block = if (cursor.isNull(0)) null else cursor.getBlob(0)
-                if (block != null && contains(block, needle)) hits++
+        // Leaf pages hold (prefix-compressed) terms; _idx holds page-boundary term prefixes.
+        for (sql in listOf("SELECT block FROM clips_fts_data", "SELECT term FROM clips_fts_idx")) {
+            db.rawQuery(sql, arrayOf()).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val block = if (cursor.isNull(0)) null else cursor.getBlob(0)
+                    if (block != null && contains(block, needle)) hits++
+                }
             }
         }
         return hits
