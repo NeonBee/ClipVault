@@ -12,8 +12,15 @@
     대상 applicationId. 기본값은 debug 빌드의 dev.clipvault.app.debug.
 
 .PARAMETER RunTest
-    ShizukuRealDeviceInstrumentedTest 를 gradlew.bat 으로 실행하고, 결과 XML 의 실행·skip·실패 수로
-    PASS / SKIPPED / FAIL 을 판정한다.
+    ShizukuRealDeviceInstrumentedTest 를 `adb shell am instrument` 로 실행하고, AndroidJUnitRunner 상태
+    코드로 PASS / SKIPPED / FAIL 을 판정한다. 앱과 앱 데이터는 지우지 않는다.
+    Gradle 의 connectedDebugAndroidTest 는 테스트 뒤 앱을 uninstall 해 vault 데이터·Keystore 키·
+    Shizuku 권한을 없애므로 쓰지 않는다. 대신 installDebug / installDebugAndroidTest(adb install -r,
+    데이터 보존)로 현재 checkout 의 빌드를 덮어 설치한다. 서명이 다르면 설치가 실패할 뿐 기존 앱은
+    지우지 않는다.
+
+.PARAMETER NoInstall
+    -RunTest 에서 설치 단계를 건너뛰고 이미 설치된 앱·테스트 APK 로만 실행한다.
 
 .PARAMETER OutFile
     출력 markdown 을 UTF-8 파일로도 저장한다.
@@ -25,6 +32,7 @@
 param(
     [string]$Package = 'dev.clipvault.app.debug',
     [switch]$RunTest,
+    [switch]$NoInstall,
     [string]$OutFile
 )
 
@@ -93,10 +101,17 @@ if ([int]::TryParse($oneUiRaw, [ref]$oneUiValue) -and $oneUiValue -gt 0) {
     $oneUi = '해당 없음(삼성 기기 아님 또는 속성 없음)'
 }
 
+# Shizuku 서버는 shell(ADB) 또는 root 계정의 "shizuku_server" 프로세스다. 매니저 앱(u0_aNNN)만
+# 떠 있으면 서버는 멈춘 상태다. 따옴표 필수: PowerShell 은 USER,NAME,ARGS 를 배열로 보고 세 인자로 나눈다.
 $shizukuUser = ''
-foreach ($line in (Invoke-Adb shell ps -A -o USER,NAME)) {
-    if ($line -match 'shizuku_server') { $shizukuUser = ($line -split '\s+')[0]; break }
+$shizukuManagerOnly = $false
+foreach ($line in (Invoke-Adb shell ps -A -o 'USER,NAME,ARGS')) {
+    if ($line -notmatch 'shizuku') { continue }
+    $user = ($line.Trim() -split '\s+')[0]
+    if ($user -eq 'shell' -or $user -eq 'root') { $shizukuUser = $user; break }
+    $shizukuManagerOnly = $true
 }
+if (-not $shizukuUser -and $shizukuManagerOnly) { $shizukuUser = '미실행(매니저 앱만 실행 중, 서버 시작 필요)' }
 
 $prefsXml = (Invoke-Adb shell run-as $Package cat shared_prefs/clipvault_settings.xml) -join "`n"
 $bridgeState = Get-Pref $prefsXml 'bridge_state'
@@ -104,34 +119,41 @@ $lastError = Get-Pref $prefsXml 'last_capture_error'
 
 $testResult = '실행 안 함(-RunTest 로 실행)'
 if ($RunTest) {
-    $root = Split-Path -Parent $PSScriptRoot
-    $results = [System.IO.Path]::Combine($root, 'app', 'build', 'outputs', 'androidTest-results', 'connected')
-    # 이전 실행의 XML 이 결과로 섞이지 않게 지운다.
-    if (Test-Path -LiteralPath $results) { Remove-Item -LiteralPath $results -Recurse -Force }
-
-    $gradle = Join-Path $root 'gradlew.bat'
-    $gradleOk = Invoke-Gradle $gradle @('-p', $root, '--no-daemon', '-q', 'connectedDebugAndroidTest',
-        '-Pandroid.testInstrumentationRunnerArguments.class=dev.clipvault.app.clipboard.ShizukuRealDeviceInstrumentedTest')
-
-    # Assume 로 skip 된 테스트도 Gradle 은 성공으로 끝나므로, XML 의 실행·skip·실패 수로 판정한다.
-    $xmlFile = $null
-    if (Test-Path -LiteralPath $results) {
-        $xmlFile = Get-ChildItem -LiteralPath $results -Recurse -Filter 'TEST-*.xml' | Select-Object -First 1
+    $testPackage = "$Package.test"
+    $runner = "$testPackage/androidx.test.runner.AndroidJUnitRunner"
+    $installOk = $true
+    if (-not $NoInstall) {
+        $root = Split-Path -Parent $PSScriptRoot
+        $gradle = Join-Path $root 'gradlew.bat'
+        # adb install -r: 앱 데이터·Shizuku 권한 유지. connectedDebugAndroidTest 는 uninstall 하므로 금지.
+        $installOk = Invoke-Gradle $gradle @('-p', $root, '--no-daemon', '-q', 'installDebug', 'installDebugAndroidTest')
     }
-    if ($null -eq $xmlFile) {
-        $testResult = 'FAIL (결과 XML 없음, Gradle 성공={0})' -f $gradleOk
+    $instrumentations = (Invoke-Adb shell pm list instrumentation) -join "`n"
+    if (-not $installOk) {
+        $testResult = 'FAIL (설치 실패: 설치된 앱과 서명이 다를 수 있음. 기존 앱은 지우지 않았음)'
+    } elseif ($instrumentations -notmatch [regex]::Escape($runner)) {
+        $testResult = "FAIL (테스트 APK $testPackage 가 설치되어 있지 않음. -NoInstall 없이 실행)"
     } else {
-        [xml]$report = Get-Content -LiteralPath $xmlFile.FullName -Raw -Encoding UTF8
-        $suite = $report.SelectSingleNode('//testsuite')
-        $count = { param($name) $value = 0; [void][int]::TryParse([string]$suite.GetAttribute($name), [ref]$value); $value }
-        $tests = & $count 'tests'
-        $skipped = & $count 'skipped'
-        $failed = (& $count 'failures') + (& $count 'errors')
-        $executed = $tests - $skipped
-        $counts = '실행 {0}, skip {1}, 실패 {2}' -f $executed, $skipped, $failed
-        if ($failed -gt 0 -or -not $gradleOk) {
+        $raw = Invoke-Adb shell am instrument -r -w -e class `
+            dev.clipvault.app.clipboard.ShizukuRealDeviceInstrumentedTest $runner
+        # AndroidJUnitRunner 상태 코드: 1 시작, 0 성공, -1 오류, -2 실패, -3 무시, -4 Assume skip.
+        $passed = 0; $skipped = 0; $failed = 0
+        foreach ($line in $raw) {
+            if ($line -match '^INSTRUMENTATION_STATUS_CODE:\s*(-?\d+)') {
+                switch ([int]$Matches[1]) {
+                    0 { $passed++ }
+                    -1 { $failed++ }
+                    -2 { $failed++ }
+                    -3 { $skipped++ }
+                    -4 { $skipped++ }
+                }
+            }
+        }
+        $crashed = (($raw -join "`n") -match 'INSTRUMENTATION_FAILED|Process crashed')
+        $counts = '실행 {0}, skip {1}, 실패 {2}' -f ($passed + $failed), $skipped, $failed
+        if ($failed -gt 0 -or $crashed) {
             $testResult = "FAIL ($counts)"
-        } elseif ($executed -eq 0) {
+        } elseif ($passed -eq 0) {
             $testResult = "SKIPPED ($counts`: Shizuku 미실행·권한 없음 등으로 bridge 검증 0건)"
         } else {
             $testResult = "PASS ($counts)"

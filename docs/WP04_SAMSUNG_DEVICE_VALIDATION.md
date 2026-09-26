@@ -44,36 +44,62 @@ The code under test includes:
 
 ## Device record
 
-Status: **PENDING** — the two values below were not recorded in the original session and must be
-collected from the same Galaxy S23 Ultra. They matter because the exact hidden-`IClipboard` signature
-table differs by API level (API 34+ uses the 4-argument `getPrimaryClip`), and the design's WP-04
-checklist separates the event listener from the polling fallback.
+Status: **PARTIAL** — device properties are recorded; the bridge mode and the real-device test are
+still **PENDING**. Both matter because the exact hidden-`IClipboard` signature table differs by API
+level (API 34+ uses the 4-argument `getPrimaryClip`), and the design's WP-04 checklist separates the
+event listener from the polling fallback.
 
-Collect on Windows from the repository root, with the device connected over adb (USB or wireless
-debugging), the debug build installed and capture enabled:
+Collected 2026-09-26T17:35Z from the same Galaxy S23 Ultra with `scripts\device-validation-record.ps1`:
+
+| Item | Value |
+| --- | --- |
+| Model | SM-S918N (dm3q) |
+| Android (API) | 16 (API 36) → `getPrimaryClip` "api34+" 4-argument variant |
+| One UI | 8.0 (80000) |
+| Build | BP2A.250605.031.A3.S918NKSS7EZCI |
+| Security patch | 2026-04-05 |
+| Shizuku server user | PENDING (the collection run is invalid, see below) |
+| Bridge mode | PENDING (`READY_EVENT` expected when the listener signature resolves; `READY_POLL:<reason>` means polling fallback) |
+| ShizukuRealDeviceInstrumentedTest | PENDING |
+
+### Why the 2026-09-26 bridge values are invalid
+
+The first version of the script (PR #8) had two defects:
+
+1. `-RunTest` ran Gradle `connectedDebugAndroidTest`, which **uninstalls the app after the test run**.
+   The installed `dev.clipvault.app.debug` was removed with its vault database, Keystore key and Shizuku
+   permission. The second run therefore saw no app data and no Shizuku permission, and every test was
+   skipped.
+2. PowerShell split the unquoted `ps -o USER,NAME` argument into three arguments, so the Shizuku server
+   check always reported "not running" regardless of the real state.
+
+Both are fixed: `-RunTest` now installs with `installDebug` / `installDebugAndroidTest` (`adb install -r`,
+data kept; a signature mismatch fails the install without removing the app) and runs the test with
+`adb shell am instrument`. The script never uninstalls or clears the app.
+
+### How to collect
+
+On Windows from the repository root, with the device connected over adb (USB or wireless debugging):
+
+1. Start Shizuku (after a reboot it must be started again) and confirm ClipVault has its permission.
+2. Open ClipVault, unlock the vault and enable capture. Settings > Diagnostics should show a
+   **Bridge mode** value.
+3. Run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1 -RunTest -OutFile wp04-device-record.md
 ```
 
 The script runs on Windows PowerShell 5.1 and PowerShell 7. It finds `adb` on `PATH`, then under
-`ANDROID_HOME`, `ANDROID_SDK_ROOT` or `%LOCALAPPDATA%\Android\Sdk`. `-RunTest` uses `gradlew.bat` and needs
-`JAVA_HOME` (JDK 17+). Without `-RunTest` it only reads device properties and the bridge mode.
+`ANDROID_HOME`, `ANDROID_SDK_ROOT` or `%LOCALAPPDATA%\Android\Sdk`. Device properties and the bridge
+mode are read **before** any install or test. `-RunTest` replaces the installed debug build with this
+checkout's build while keeping its data; it needs `JAVA_HOME` (JDK 17+). Add `-NoInstall` to test
+only the APKs already on the device. The instrumentation run restarts the app process, so capture
+restarts afterwards. Test results are PASS / SKIPPED / FAIL from AndroidJUnitRunner status codes, so
+a run where every test was skipped by `Assume` is not reported as PASS. No clipboard content is read.
 
-The script prints a markdown table (model, Android/API, One UI, build, security patch, Shizuku server
-user, bridge mode, last sanitized error, real-device test result as PASS / SKIPPED / FAIL from the
-connected-test XML, so a run where every test was skipped by `Assume` is not reported as PASS). It
-reads no clipboard content.
-Replace this section's table with its output. For a release build, read **Bridge mode** and
-**Android build** from Settings > Diagnostics instead.
-
-| Item | Value |
-| --- | --- |
-| Model | Galaxy S23 Ultra |
-| Android (API) | PENDING |
-| One UI | PENDING |
-| Build | PENDING |
-| Bridge mode | PENDING (`READY_EVENT` expected when the listener signature resolves; `READY_POLL:<reason>` means polling fallback) |
+Copy the Shizuku server user, bridge mode and test result from its output into the table above. For a
+release build, read **Bridge mode** from Settings > Diagnostics instead.
 
 ## Secure Folder boundary
 
@@ -109,7 +135,7 @@ Satisfied:
 Non-blocking diagnostic follow-up:
 
 - [x] Expose `READY_EVENT` / `READY_POLL` explicitly: Settings > Diagnostics shows **Bridge mode** and **Android build**.
-- [ ] Record the Android / One UI version the validation ran on (see "Device record").
+- [x] Record the Android / One UI version the validation ran on (see "Device record").
 - [ ] Record the observed bridge mode (see "Device record").
 
 ## Decision
