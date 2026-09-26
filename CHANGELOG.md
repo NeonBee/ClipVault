@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (DeX fork hardening)
+
+- Pinned the audit baseline at upstream `ee1f24af3010dd26be7d95545ea9dbf0fd703622` (ClipVault 2.0.0).
+- Updated SQLCipher Android from 4.17.0 to 4.19.0 stable.
+- Marked `gradlew` executable in git so CI `./gradlew` steps no longer fail with exit code 126.
+
 ## 2.0.0
 
 - Rebuilt the application UI in Kotlin and Jetpack Compose with adaptive navigation, Paging 3 and Persian/English layouts.
