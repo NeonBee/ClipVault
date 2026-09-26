@@ -51,13 +51,24 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
     private final Runnable reprobe = this::reprobe;
     private final Runnable bindTimeout = this::onBindTimeout;
     private volatile int transientFailures;
+    /** Set when a bind attempt timed out; a late onServiceConnected for it is dropped. */
+    private boolean bindAbandoned;
 
     private final IClipboardListener remoteListener = new IClipboardListener.Stub() {
         @Override
         public void onClipboardChanged(String text) {
-            if (clipboardListener != null) clipboardListener.onClipboardChanged(text);
+            deliverClipboardChange(text);
         }
     };
+
+    /**
+     * Binder callbacks can already be in flight when {@link #close()} unregisters the listener.
+     * After close (capture disabled or service destroyed) such a late clip must not be captured.
+     */
+    void deliverClipboardChange(@Nullable String text) {
+        if (!started || clipboardListener == null) return;
+        clipboardListener.onClipboardChanged(text);
+    }
 
     private final Shizuku.OnBinderReceivedListener binderReceivedListener = this::tryBind;
     private final Shizuku.OnBinderDeadListener binderDeadListener = () -> mainHandler.post(() -> {
@@ -74,6 +85,16 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
             mainHandler.removeCallbacks(bindTimeout);
             binding = false;
             if (!started) return;
+            if (bindAbandoned) {
+                // Arrived after the timeout already unbound and scheduled a fresh attempt.
+                bindAbandoned = false;
+                try {
+                    Shizuku.unbindUserService(serviceArgs, connection, true);
+                } catch (RuntimeException ignored) {
+                    // Shizuku may already be stopped.
+                }
+                return;
+            }
             IClipboardBridge candidate = IClipboardBridge.Stub.asInterface(binder);
             try {
                 if (candidate == null) throw new RemoteException("Null bridge");
@@ -243,6 +264,7 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
                 return;
             }
             binding = true;
+            bindAbandoned = false;
             mainHandler.postDelayed(bindTimeout, BIND_TIMEOUT_MS);
             Shizuku.bindUserService(serviceArgs, connection);
         } catch (RuntimeException error) {
@@ -257,6 +279,7 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
     private void onBindTimeout() {
         if (!started || !binding) return;
         binding = false;
+        bindAbandoned = true;
         try {
             Shizuku.unbindUserService(serviceArgs, connection, true);
         } catch (RuntimeException ignored) {

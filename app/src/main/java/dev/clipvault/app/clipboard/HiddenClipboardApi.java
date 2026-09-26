@@ -9,8 +9,8 @@ import java.util.Arrays;
 
 /**
  * Exact-signature table for the hidden {@code android.content.IClipboard} methods ClipVault uses.
- * A method is only called when its name, return type and full parameter list match a known AOSP
- * variant, so a vendor overload or a reordered parameter list fails closed instead of receiving
+ * A method is only called when its name, fully-qualified return type and full parameter list match
+ * a known AOSP variant, so a vendor overload or a reordered parameter list fails closed instead of receiving
  * guessed arguments. Pure Java so the resolution rules run in JVM unit tests.
  *
  * <p>Sources: frameworks/base core/java/android/content/IClipboard.aidl at android-7.0.0_r1
@@ -20,30 +20,47 @@ final class HiddenClipboardApi {
     static final String SHELL_PACKAGE = "com.android.shell";
     /** android.content.Context.DEVICE_ID_DEFAULT. */
     static final int DEFAULT_DEVICE_ID = 0;
-    static final String LISTENER_TYPE = "IOnPrimaryClipChangedListener";
-
     enum Param { PACKAGE, ATTRIBUTION_TAG, USER_ID, DEVICE_ID, LISTENER }
+
+    enum Returns { CLIP_DATA, VOID }
+
+    /** Fully-qualified framework type names; injectable so JVM tests can use stand-in types. */
+    static final class Types {
+        static final Types AOSP = new Types("android.content.ClipData",
+                "android.content.IOnPrimaryClipChangedListener");
+
+        @NonNull final String clipData;
+        @NonNull final String listener;
+
+        Types(@NonNull String clipData, @NonNull String listener) {
+            this.clipData = clipData;
+            this.listener = listener;
+        }
+    }
 
     static final class Signature {
         @NonNull final String label;
         @NonNull final String name;
-        @NonNull final String returnType;
+        @NonNull final Returns returnType;
         @NonNull final Param[] params;
 
-        Signature(@NonNull String label, @NonNull String name, @NonNull String returnType, @NonNull Param... params) {
+        Signature(@NonNull String label, @NonNull String name, @NonNull Returns returnType, @NonNull Param... params) {
             this.label = label;
             this.name = name;
             this.returnType = returnType;
             this.params = params;
         }
 
-        boolean matches(@NonNull Method method) {
+        boolean matches(@NonNull Method method, @NonNull Types typeNames) {
             if (!method.getName().equals(name)) return false;
-            if (!method.getReturnType().getSimpleName().equals(returnType)) return false;
+            Class<?> returned = method.getReturnType();
+            boolean returnMatches = returnType == Returns.VOID
+                    ? returned == void.class : returned.getName().equals(typeNames.clipData);
+            if (!returnMatches) return false;
             Class<?>[] types = method.getParameterTypes();
             if (types.length != params.length) return false;
             for (int index = 0; index < types.length; index++) {
-                if (!accepts(params[index], types[index])) return false;
+                if (!accepts(params[index], types[index], typeNames)) return false;
             }
             return true;
         }
@@ -53,7 +70,7 @@ final class HiddenClipboardApi {
             return false;
         }
 
-        private static boolean accepts(@NonNull Param param, @NonNull Class<?> type) {
+        private static boolean accepts(@NonNull Param param, @NonNull Class<?> type, @NonNull Types typeNames) {
             switch (param) {
                 case PACKAGE:
                 case ATTRIBUTION_TAG:
@@ -62,7 +79,7 @@ final class HiddenClipboardApi {
                 case DEVICE_ID:
                     return type == int.class;
                 case LISTENER:
-                    return !type.isPrimitive() && type.getSimpleName().equals(LISTENER_TYPE);
+                    return type.getName().equals(typeNames.listener);
                 default:
                     return false;
             }
@@ -71,24 +88,24 @@ final class HiddenClipboardApi {
 
     /** Newest first. Android 13 changed the list during its lifetime (r1 vs r50). */
     static final Signature[] READ_SIGNATURES = {
-            new Signature("api34+", "getPrimaryClip", "ClipData",
+            new Signature("api34+", "getPrimaryClip", Returns.CLIP_DATA,
                     Param.PACKAGE, Param.ATTRIBUTION_TAG, Param.USER_ID, Param.DEVICE_ID),
-            new Signature("api33-late", "getPrimaryClip", "ClipData",
+            new Signature("api33-late", "getPrimaryClip", Returns.CLIP_DATA,
                     Param.PACKAGE, Param.ATTRIBUTION_TAG, Param.USER_ID),
-            new Signature("api29-33", "getPrimaryClip", "ClipData",
+            new Signature("api29-33", "getPrimaryClip", Returns.CLIP_DATA,
                     Param.PACKAGE, Param.USER_ID),
-            new Signature("api24-28", "getPrimaryClip", "ClipData",
+            new Signature("api24-28", "getPrimaryClip", Returns.CLIP_DATA,
                     Param.PACKAGE),
     };
 
     static final Signature[] LISTENER_SIGNATURES = {
-            new Signature("api34+", "addPrimaryClipChangedListener", "void",
+            new Signature("api34+", "addPrimaryClipChangedListener", Returns.VOID,
                     Param.LISTENER, Param.PACKAGE, Param.ATTRIBUTION_TAG, Param.USER_ID, Param.DEVICE_ID),
-            new Signature("api33-late", "addPrimaryClipChangedListener", "void",
+            new Signature("api33-late", "addPrimaryClipChangedListener", Returns.VOID,
                     Param.LISTENER, Param.PACKAGE, Param.ATTRIBUTION_TAG, Param.USER_ID),
-            new Signature("api29-33", "addPrimaryClipChangedListener", "void",
+            new Signature("api29-33", "addPrimaryClipChangedListener", Returns.VOID,
                     Param.LISTENER, Param.PACKAGE, Param.USER_ID),
-            new Signature("api24-28", "addPrimaryClipChangedListener", "void",
+            new Signature("api24-28", "addPrimaryClipChangedListener", Returns.VOID,
                     Param.LISTENER, Param.PACKAGE),
     };
 
@@ -136,11 +153,16 @@ final class HiddenClipboardApi {
      */
     @Nullable
     static Binding resolve(@NonNull Class<?> api, @NonNull Signature[] table) {
+        return resolve(api, table, Types.AOSP);
+    }
+
+    @Nullable
+    static Binding resolve(@NonNull Class<?> api, @NonNull Signature[] table, @NonNull Types typeNames) {
         Method[] methods = api.getMethods();
         Arrays.sort(methods, (left, right) -> left.toGenericString().compareTo(right.toGenericString()));
         for (Signature signature : table) {
             for (Method method : methods) {
-                if (signature.matches(method)) return new Binding(signature, method);
+                if (signature.matches(method, typeNames)) return new Binding(signature, method);
             }
         }
         return null;

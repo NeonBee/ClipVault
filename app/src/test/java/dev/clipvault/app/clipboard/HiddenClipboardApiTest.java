@@ -13,9 +13,24 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class HiddenClipboardApiTest {
-    /** Stand-ins: resolution matches on simple names, like the framework types. */
+    /** Stand-ins for the framework types, injected by fully-qualified name. */
     static final class ClipData {}
     interface IOnPrimaryClipChangedListener {}
+
+    private static final HiddenClipboardApi.Types TEST_TYPES = new HiddenClipboardApi.Types(
+            ClipData.class.getName(), IOnPrimaryClipChangedListener.class.getName());
+
+    /** Same simple names in another "package": must never be taken for the real types. */
+    static final class Vendor {
+        static final class ClipData {}
+        interface IOnPrimaryClipChangedListener {}
+
+        interface LookAlike {
+            ClipData getPrimaryClip(String pkg, String attributionTag, int userId, int deviceId);
+            void addPrimaryClipChangedListener(IOnPrimaryClipChangedListener listener, String callingPackage,
+                                               String attributionTag, int userId, int deviceId);
+        }
+    }
 
     interface Api34 {
         ClipData getPrimaryClip(String pkg, String attributionTag, int userId, int deviceId);
@@ -73,7 +88,7 @@ public class HiddenClipboardApiTest {
     @Test
     public void vendorOverloadsDoNotChangeTheSelectedAospSignature() {
         HiddenClipboardApi.Binding binding =
-                HiddenClipboardApi.resolve(VendorOverloaded.class, HiddenClipboardApi.READ_SIGNATURES);
+                resolveTest(VendorOverloaded.class, HiddenClipboardApi.READ_SIGNATURES);
         assertNotNull(binding);
         assertEquals("api34+", binding.signature.label);
         assertEquals(4, binding.method.getParameterCount());
@@ -81,10 +96,26 @@ public class HiddenClipboardApiTest {
 
     @Test
     public void unknownSignaturesFailClosed() {
-        assertNull(HiddenClipboardApi.resolve(UnknownOnly.class, HiddenClipboardApi.READ_SIGNATURES));
-        assertNull(HiddenClipboardApi.resolve(UnknownOnly.class, HiddenClipboardApi.LISTENER_SIGNATURES));
-        assertNull(HiddenClipboardApi.resolve(WrongReturnType.class, HiddenClipboardApi.READ_SIGNATURES));
-        assertNull(HiddenClipboardApi.resolve(VendorOverloaded.class, HiddenClipboardApi.LISTENER_SIGNATURES));
+        assertNull(resolveTest(UnknownOnly.class, HiddenClipboardApi.READ_SIGNATURES));
+        assertNull(resolveTest(UnknownOnly.class, HiddenClipboardApi.LISTENER_SIGNATURES));
+        assertNull(resolveTest(WrongReturnType.class, HiddenClipboardApi.READ_SIGNATURES));
+        assertNull(resolveTest(VendorOverloaded.class, HiddenClipboardApi.LISTENER_SIGNATURES));
+    }
+
+    @Test
+    public void sameSimpleNameInAnotherPackageIsRejected() {
+        assertNull(resolveTest(Vendor.LookAlike.class, HiddenClipboardApi.READ_SIGNATURES));
+        assertNull(resolveTest(Vendor.LookAlike.class, HiddenClipboardApi.LISTENER_SIGNATURES));
+    }
+
+    @Test
+    public void productionTypesRequireTheRealFrameworkClasses() {
+        // Stand-ins share the simple names ClipData / IOnPrimaryClipChangedListener but not the
+        // android.content package, so the AOSP type table must not accept them.
+        assertNull(HiddenClipboardApi.resolve(Api34.class, HiddenClipboardApi.READ_SIGNATURES));
+        assertNull(HiddenClipboardApi.resolve(Api34.class, HiddenClipboardApi.LISTENER_SIGNATURES));
+        assertEquals("android.content.ClipData", HiddenClipboardApi.Types.AOSP.clipData);
+        assertEquals("android.content.IOnPrimaryClipChangedListener", HiddenClipboardApi.Types.AOSP.listener);
     }
 
     @Test
@@ -127,20 +158,24 @@ public class HiddenClipboardApiTest {
         };
         // Resolve on the implementation class, as the service does with the IClipboard proxy.
         HiddenClipboardApi.Binding binding =
-                HiddenClipboardApi.resolve(implementation.getClass(), HiddenClipboardApi.READ_SIGNATURES);
+                resolveTest(implementation.getClass(), HiddenClipboardApi.READ_SIGNATURES);
         assertNotNull(binding);
         assertTrue(binding.invoke(implementation, 10, null) instanceof ClipData);
         assertEquals(List.of("com.android.shell", 10), calls);
     }
 
+    private static HiddenClipboardApi.Binding resolveTest(Class<?> api, HiddenClipboardApi.Signature[] table) {
+        return HiddenClipboardApi.resolve(api, table, TEST_TYPES);
+    }
+
     private static HiddenClipboardApi.Binding read(Class<?> api) {
-        HiddenClipboardApi.Binding binding = HiddenClipboardApi.resolve(api, HiddenClipboardApi.READ_SIGNATURES);
+        HiddenClipboardApi.Binding binding = resolveTest(api, HiddenClipboardApi.READ_SIGNATURES);
         assertNotNull(binding);
         return binding;
     }
 
     private static HiddenClipboardApi.Binding listener(Class<?> api) {
-        HiddenClipboardApi.Binding binding = HiddenClipboardApi.resolve(api, HiddenClipboardApi.LISTENER_SIGNATURES);
+        HiddenClipboardApi.Binding binding = resolveTest(api, HiddenClipboardApi.LISTENER_SIGNATURES);
         assertNotNull(binding);
         return binding;
     }
