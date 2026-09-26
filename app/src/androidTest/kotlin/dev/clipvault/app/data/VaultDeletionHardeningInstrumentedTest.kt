@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import net.zetetic.database.sqlcipher.SQLiteDatabase
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -15,8 +16,8 @@ import org.junit.runner.RunWith
  * Forensic deletion checks for the FTS5 index. The marker must disappear from the decrypted
  * `clips_fts_data` / `clips_fts_idx` shadow tables, not only from MATCH results. Markers use a
  * prefix no filler term shares, so a leftover would be stored in full rather than prefix-compressed.
- * WAL frames are not inspected here: close() checkpoints them; VaultRepository also truncates the
- * WAL after every hard delete.
+ * WAL tests check `clipvault.db-wal` while the repository is still open, because close() would
+ * checkpoint it anyway and hide a missing security checkpoint.
  */
 @RunWith(AndroidJUnit4::class)
 class VaultDeletionHardeningInstrumentedTest {
@@ -98,6 +99,47 @@ class VaultDeletionHardeningInstrumentedTest {
             assertEquals(0, shadowRowsContaining(db, marker))
         }
     }
+
+    @Test fun hardDeleteTruncatesWalWhileVaultStaysOpen() {
+        VaultRepository(context, key.copyOf()).use { repository ->
+            insertFiller(repository)
+            val id = repository.insert("$marker wal", 5_000)
+            // Precondition: without a checkpoint the WAL still holds the inserted pages.
+            assertTrue("precondition: WAL has frames", walFile().length() > 0)
+            repository.moveToTrash(listOf(id), "manual", 6_000)
+            assertEquals(1, repository.permanentlyDelete(listOf(id)))
+            assertEquals(0L, walFile().length())
+            assertFalse(repository.isWalTruncatePending)
+        }
+    }
+
+    @Test fun editTruncatesWalWhileVaultStaysOpen() {
+        VaultRepository(context, key.copyOf()).use { repository ->
+            val id = repository.insert("editedsecret4412 original", 1_000)
+            assertTrue("precondition: WAL has frames", walFile().length() > 0)
+            assertTrue(repository.edit(id, "replacement text", "", ""))
+            assertEquals(0L, walFile().length())
+        }
+    }
+
+    @Test fun replaceRestoreDefersCheckpointUntilTransactionCommits() {
+        VaultRepository(context, key.copyOf()).use { repository ->
+            insertFiller(repository)
+            repository.insert("$marker restore", 5_000)
+            repository.runInTransaction {
+                repository.clearForRestore()
+                // A checkpoint cannot complete inside the transaction; it must be pending.
+                assertTrue(repository.isWalTruncatePending)
+                repository.insert("restored clip", 7_000)
+            }
+            assertFalse(repository.isWalTruncatePending)
+            assertEquals(0L, walFile().length())
+            assertEquals(1, repository.count())
+        }
+        rawDatabase { db -> assertEquals(0, shadowRowsContaining(db, marker)) }
+    }
+
+    private fun walFile() = java.io.File(context.getDatabasePath("clipvault.db").path + "-wal")
 
     private fun insertFiller(repository: VaultRepository) {
         repeat(40) { repository.insert("filler entry number $it alpha", 1_000L + it) }

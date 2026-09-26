@@ -3,10 +3,11 @@
 ## Unreleased (DeX fork hardening)
 
 - Pinned the audit baseline at upstream `ee1f24af3010dd26be7d95545ea9dbf0fd703622` (ClipVault 2.0.0).
-- Updated SQLCipher Android from 4.17.0 to 4.19.0 stable.
-- Moved the vault to schema v3: FTS5 `secure-delete` is enabled, v2 indexes are rebuilt and the WAL is truncated so deleted clips leave no terms in FTS shadow tables. Added forensic deletion instrumentation tests.
+- Updated SQLCipher Android from 4.17.0 to 4.19.0 stable and AndroidX SQLite from 2.6.2 to 2.7.1, matching the SQLCipher 4.19 integration guide (2.7.0+).
+- Moved the vault to schema v3: FTS5 `secure-delete` is enabled, v2 indexes are rebuilt, and a busy-aware `wal_checkpoint(TRUNCATE)` runs after migration, hard delete, Trash purge, edit and replace-restore (deferred to commit inside transactions) so deleted clips leave no terms in FTS shadow tables or the WAL. Added forensic deletion instrumentation tests.
 - Replaced the Shizuku bridge with protocol v3: shell-UID-only backend with Sui auto-init disabled, per-user UserService tags and single-caller binding, exact AOSP signature adapters for `getPrimaryClip` and `addPrimaryClipChangedListener`, capability probe, structured error codes, a `BridgeHealth` state machine shown in diagnostics and the notification, and a 128,000-char payload limit that rejects instead of truncating.
 - Marked `gradlew` executable in git so CI `./gradlew` steps no longer fail with exit code 126.
+- Moved CI to `android-actions/setup-android@v4` with SDK packages passed as action input; v3 failed on current runners installing the removed `tools` package.
 
 ## 2.0.0
 

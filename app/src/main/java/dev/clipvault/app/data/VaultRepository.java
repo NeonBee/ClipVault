@@ -32,7 +32,11 @@ public final class VaultRepository implements AutoCloseable {
             "c.id,c.content,c.title,c.note,c.domain,c.first_captured_at,c.last_captured_at," +
             "c.capture_count,c.char_count,c.flags,c.favorite,c.pinned,c.collection_id,c.deleted_at";
 
+    private static final int WAL_CHECKPOINT_ATTEMPTS = 3;
+    private static final long WAL_CHECKPOINT_RETRY_MS = 20L;
+
     private SQLiteDatabase database;
+    private boolean walTruncatePending;
 
     public VaultRepository(@NonNull Context context, @NonNull byte[] databaseKey) {
         if (databaseKey.length != 32) throw new IllegalArgumentException("Database key must be 256 bits");
@@ -94,9 +98,45 @@ public final class VaultRepository implements AutoCloseable {
      * transaction after hard deletes, edits and the v2 → v3 migration.
      */
     private void checkpointAndTruncateWal() {
-        try (Cursor cursor = database.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", new String[0])) {
-            cursor.moveToFirst();
+        secureCheckpoint();
+    }
+
+    /**
+     * Security checkpoint: {@code PRAGMA wal_checkpoint(TRUNCATE)} and check its busy column.
+     * Inside a transaction the checkpoint cannot complete, so it is deferred to the end of
+     * {@link #runInTransaction} (or {@link #close}). A busy result is retried a few times and
+     * otherwise left pending for the next opportunity; {@link #isWalTruncatePending()} exposes it.
+     *
+     * @return true when the WAL was fully checkpointed and truncated now
+     */
+    public synchronized boolean secureCheckpoint() {
+        ensureOpen();
+        if (database.inTransaction()) {
+            walTruncatePending = true;
+            return false;
         }
+        for (int attempt = 0; attempt < WAL_CHECKPOINT_ATTEMPTS; attempt++) {
+            try (Cursor cursor = database.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", new String[0])) {
+                // Columns: busy, WAL frames, checkpointed frames. busy=0 means TRUNCATE completed.
+                if (cursor.moveToFirst() && cursor.getInt(0) == 0) {
+                    walTruncatePending = false;
+                    return true;
+                }
+            }
+            try {
+                Thread.sleep(WAL_CHECKPOINT_RETRY_MS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        walTruncatePending = true;
+        return false;
+    }
+
+    /** True while deleted page images may still be in the WAL because a checkpoint was deferred or busy. */
+    public synchronized boolean isWalTruncatePending() {
+        return walTruncatePending;
     }
 
     /** Exposed for security instrumentation tests; reports the persistent FTS5 option. */
@@ -668,6 +708,7 @@ public final class VaultRepository implements AutoCloseable {
         } finally {
             database.endTransaction();
         }
+        if (walTruncatePending && !database.inTransaction()) secureCheckpoint();
     }
 
     public synchronized void clearForRestore() {
@@ -677,6 +718,8 @@ public final class VaultRepository implements AutoCloseable {
         database.delete("tags", null, null);
         database.delete("collections", null, null);
         database.delete("capture_rules", null, null);
+        // Usually runs inside the restore transaction: deferred until runInTransaction commits.
+        secureCheckpoint();
     }
 
     public synchronized long mergeImportedClip(@NonNull BackupClipData clip) {
@@ -710,6 +753,7 @@ public final class VaultRepository implements AutoCloseable {
     @Override
     public synchronized void close() {
         if (database != null) {
+            if (walTruncatePending && database.isOpen() && !database.inTransaction()) secureCheckpoint();
             database.close();
             database = null;
         }
