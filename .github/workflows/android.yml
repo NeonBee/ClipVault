@@ -23,11 +23,10 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: gradle
-      - uses: android-actions/setup-android@v3
-      - name: Install Android toolchain
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      # v3 installs the removed "tools" package by default and fails on current runners.
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;27.2.12479018 cmake;3.22.1
       - name: Unit, lint, native and APK checks
         run: ./gradlew --no-daemon testDebugUnitTest lintDebug externalNativeBuildDebug assembleDebug
       - name: Assert offline manifest
@@ -50,11 +49,10 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: gradle
-      - uses: android-actions/setup-android@v3
-      - name: Install build toolchain
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      # v3 installs the removed "tools" package by default and fails on current runners.
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;27.2.12479018 cmake;3.22.1
       - name: Encrypted migration, backup, native and Compose tests
         uses: reactivecircus/android-emulator-runner@v2
         with:

@@ -6,6 +6,7 @@
 - Updated SQLCipher Android from 4.17.0 to 4.19.0 stable and AndroidX SQLite from 2.6.2 to 2.7.1, matching the SQLCipher 4.19 integration guide (2.7.0+).
 - Moved the vault to schema v3: FTS5 `secure-delete` is enabled, v2 indexes are rebuilt, and a busy-aware `wal_checkpoint(TRUNCATE)` runs after migration, hard delete, Trash purge, edit and replace-restore (deferred to commit inside transactions) so deleted clips leave no terms in FTS shadow tables or the WAL. Added forensic deletion instrumentation tests.
 - Marked `gradlew` executable in git so CI `./gradlew` steps no longer fail with exit code 126.
+- Moved CI to `android-actions/setup-android@v4` with SDK packages passed as action input; v3 failed on current runners installing the removed `tools` package.
 
 ## 2.0.0
 
