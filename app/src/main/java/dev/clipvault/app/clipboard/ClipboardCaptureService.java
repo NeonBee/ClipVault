@@ -165,6 +165,8 @@ public final class ClipboardCaptureService extends Service {
 
     @Override
     public void onDestroy() {
+        // First: an in-flight poll or bridge callback must not capture once capture is stopped.
+        if (coordinator != null) coordinator.close();
         if (clipboardManager != null) clipboardManager.removePrimaryClipChangedListener(localListener);
         if (poller != null) poller.shutdownNow();
         if (shizukuController != null) shizukuController.close();

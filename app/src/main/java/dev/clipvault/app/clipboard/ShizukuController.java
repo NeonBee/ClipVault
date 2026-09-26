@@ -62,12 +62,17 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
     };
 
     /**
-     * Binder callbacks can already be in flight when {@link #close()} unregisters the listener.
-     * After close (capture disabled or service destroyed) such a late clip must not be captured.
+     * Called on a Binder thread. Checking {@code started} there and then calling the listener is a
+     * check-then-act race with {@link #close()} on the main thread. Delivery is therefore handed
+     * to the main looper and {@code started} is checked inside the runnable: close() and delivery
+     * run on the same looper, so the order is either "deliver, then close" or "close, then drop".
      */
     void deliverClipboardChange(@Nullable String text) {
-        if (!started || clipboardListener == null) return;
-        clipboardListener.onClipboardChanged(text);
+        if (clipboardListener == null) return;
+        mainHandler.post(() -> {
+            if (!started) return;
+            clipboardListener.onClipboardChanged(text);
+        });
     }
 
     private final Shizuku.OnBinderReceivedListener binderReceivedListener = this::tryBind;
@@ -144,6 +149,7 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
                 .tag("clipvault.clipboard.v3.u" + userId);
     }
 
+    /** Must run on the main thread, like {@link #close()}; delivery is serialized with both. */
     public void start() {
         if (started) return;
         started = true;
@@ -311,6 +317,7 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
         if (listener != null) listener.onStateChanged(next);
     }
 
+    /** Must run on the main thread: after it returns no bridge callback reaches the listener. */
     @Override
     public void close() {
         if (!started) return;
