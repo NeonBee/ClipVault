@@ -708,7 +708,12 @@ private fun SettingsScreen(
             DiagnosticRow(stringResource(R.string.last_successful_capture),
                 if (state.lastCaptureAt == 0L) stringResource(R.string.never) else formatDateTime(state.lastCaptureAt))
             DiagnosticRow(stringResource(R.string.last_sanitized_error),
-                if (state.lastCaptureError.isBlank()) stringResource(R.string.none) else stringResource(R.string.bridge_unavailable))
+                when (state.lastCaptureError) {
+                    "" -> stringResource(R.string.none)
+                    "bridge_unavailable" -> stringResource(R.string.bridge_unavailable)
+                    // Sanitized bridge state identifier such as DEGRADED:BACKEND_NOT_SHELL.
+                    else -> state.lastCaptureError
+                })
             DiagnosticRow(stringResource(R.string.database), stringResource(R.string.encrypted_unlocked))
             DiagnosticRow(stringResource(R.string.network_permission), stringResource(R.string.not_present))
         }

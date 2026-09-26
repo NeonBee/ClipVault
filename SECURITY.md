@@ -30,7 +30,7 @@ There is intentionally no recovery key, server escrow or bypass. Losing or inval
 
 ## Shizuku boundary
 
-The Shizuku UserService exposes a small AIDL v2 interface: protocol version, read current text, register/unregister clipboard listener and destroy. It does not accept shell commands or expose general system services. Hidden clipboard APIs are accessed reflectively because public Android APIs prohibit continuous background clipboard reads; this can break on vendor ROMs and is not itself a security guarantee.
+The Shizuku UserService exposes a small AIDL v3 interface: protocol version, read current text, register/unregister clipboard listener, capability probe, last error code and destroy. It does not accept shell commands or expose general system services. It runs only under the ADB shell UID 2000; root and Sui backends are refused. Each Android user gets its own service instance bound to one app UID, and clipboard text over 128,000 chars is rejected rather than truncated. Error codes and diagnostics never contain clipboard content. Hidden clipboard APIs are accessed reflectively because public Android APIs prohibit continuous background clipboard reads; this can break on vendor ROMs and is not itself a security guarantee.
 
 ## Network boundary
 
