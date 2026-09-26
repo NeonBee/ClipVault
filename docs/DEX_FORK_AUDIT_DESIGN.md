@@ -790,21 +790,27 @@ Shizuku bridge에는 clipboard 이외의 범용 input API를 추가하지 않는
 
 # 21. 구현 단계
 
-## PR-01 Baseline / dependency
+용어 규칙:
+
+- `PR #N`: GitHub의 실제 Pull Request 번호. 예: `PR #6`.
+- `WP-NN`: 설계/로드맵상의 Work Package 번호. GitHub PR 번호와 독립적이다.
+- 기존 문서의 `PR-01`~`PR-08` 표기는 혼동 방지를 위해 `WP-01`~`WP-08`로 전환한다.
+
+## WP-01 Baseline / dependency
 
 - audit baseline SHA 고정
 - SQLCipher 4.19 stable 검토
 - debug/release R8 build
 - 기존 tests green
 
-## PR-02 DB deletion hardening
+## WP-02 DB deletion hardening
 
 - schema v3
 - FTS5 secure-delete
 - FTS rebuild migration
 - deletion instrumentation tests
 
-## PR-03 Shizuku bridge v3
+## WP-03 Shizuku bridge v3
 
 - protocol v3
 - shell-only backend
@@ -814,7 +820,7 @@ Shizuku bridge에는 clipboard 이외의 범용 input API를 추가하지 않는
 - user scoping
 - adaptive polling 유지
 
-## PR-04 Device compatibility
+## WP-04 Device compatibility
 
 - Samsung target device
 - Android 16
@@ -824,7 +830,7 @@ Shizuku bridge에는 clipboard 이외의 범용 input API를 추가하지 않는
 - doze/wake
 - oversized payload reject
 
-## PR-05 QuickPasteActivity
+## WP-05 QuickPasteActivity
 
 - FTS search
 - keyboard nav
@@ -832,20 +838,20 @@ Shizuku bridge에는 clipboard 이외의 범용 input API를 추가하지 않는
 - `FLAG_SECURE`
 - locked → biometric
 
-## PR-06 DeX UX
+## WP-06 DeX UX
 
 - freeform window sizing
 - focus
 - taskbar/notification/Quick Settings invocation
 - DeX density
 
-## PR-07 Optional global shortcut
+## WP-07 Optional global shortcut
 
 - 별도 feature flag
 - AccessibilityService 사용 시 최소 기능
 - disabled by default
 
-## PR-08 Optional StrongBox
+## WP-08 Optional StrongBox
 
 - capability detection
 - StrongBox preference
