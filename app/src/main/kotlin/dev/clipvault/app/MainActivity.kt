@@ -4,9 +4,6 @@ import android.Manifest
 import android.app.AlertDialog
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
-import android.content.ClipData
-import android.content.ClipDescription
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -14,11 +11,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.os.PersistableBundle
 import android.provider.Settings
-import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.text.InputType
 import android.view.WindowManager
 import android.widget.EditText
@@ -42,8 +35,11 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.lifecycleScope
 import dev.clipvault.app.backup.VaultBackupManager
 import dev.clipvault.app.clipboard.ClipboardCaptureService
+import dev.clipvault.app.clipboard.SensitiveClipboard
 import dev.clipvault.app.clipboard.ShizukuController
 import dev.clipvault.app.data.ClipItem
+import dev.clipvault.app.quickpaste.QuickPasteShortcut
+import dev.clipvault.app.security.BiometricVaultUnlock
 import dev.clipvault.app.security.VaultKeyManager
 import dev.clipvault.app.ui.ClipVaultUi
 import dev.clipvault.app.ui.VaultViewModel
@@ -54,9 +50,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
-import java.security.GeneralSecurityException
-import java.util.Arrays
-import javax.crypto.Cipher
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -64,22 +57,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val viewModel: VaultViewModel by viewModels()
-    private val mainHandler = Handler(Looper.getMainLooper())
     private lateinit var app: ClipVaultApp
     private lateinit var keyManager: VaultKeyManager
-    private var enrolling = false
+    private lateinit var unlocker: BiometricVaultUnlock
     private var shizukuReady by mutableStateOf(false)
     private var captureEnabled by mutableStateOf(false)
     private var pendingExportPassphrase: CharArray? = null
 
-    private val autoLock = Runnable { lockVault() }
+    // Auto-lock and screen-off locking live in ClipVaultApp so every ClipVault window shares them.
+    private val vaultLockListener = Runnable { viewModel.onVaultLocked() }
     private val dataChangedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) = viewModel.refresh()
-    }
-    private val securityReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == Intent.ACTION_SCREEN_OFF) lockVault()
-        }
     }
     private val shizukuBinderListener = Shizuku.OnBinderReceivedListener { updateCaptureState() }
     private val shizukuDeadListener = Shizuku.OnBinderDeadListener { updateCaptureState() }
@@ -108,10 +96,11 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         app = application as ClipVaultApp
         keyManager = VaultKeyManager(this)
+        unlocker = BiometricVaultUnlock(this, app, keyManager, unlockListener)
+        app.addLockListener(vaultLockListener)
         ContextCompat.registerReceiver(this, dataChangedReceiver,
             IntentFilter(ClipVaultApp.ACTION_DATA_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED)
-        ContextCompat.registerReceiver(this, securityReceiver,
-            IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_EXPORTED)
+        QuickPasteShortcut.publish(this)
         registerShizukuListeners()
         updateCaptureState()
         handleIncomingText(intent)
@@ -155,9 +144,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun beginBiometricUnlock() {
-        val availability = BiometricManager.from(this).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-        if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+    private fun beginBiometricUnlock() = unlocker.start(allowEnrollment = true)
+
+    private val unlockListener = object : BiometricVaultUnlock.Listener {
+        override fun onUnavailable(availability: Int) {
             viewModel.setError(getString(R.string.biometric_unavailable))
             if (availability == BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED && Build.VERSION.SDK_INT >= 30) {
                 runCatching {
@@ -166,61 +156,17 @@ class MainActivity : AppCompatActivity() {
                         BiometricManager.Authenticators.BIOMETRIC_STRONG))
                 }.onFailure { startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS)) }
             }
-            return
         }
-        try {
-            enrolling = !keyManager.isProvisioned
-            val cipher = if (enrolling) keyManager.createEnrollmentCipher() else keyManager.createUnlockCipher()
-            val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
-                object : BiometricPrompt.AuthenticationCallback() {
-                    override fun onAuthenticationError(code: Int, message: CharSequence) = viewModel.setError(message.toString())
-                    override fun onAuthenticationFailed() = viewModel.setError(getString(R.string.biometric_failed))
-                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                        val authenticated = result.cryptoObject?.cipher
-                        if (authenticated == null) viewModel.setError(getString(R.string.crypto_object_missing))
-                        else finishBiometricUnlock(authenticated, enrolling)
-                    }
-                })
-            val info = BiometricPrompt.PromptInfo.Builder()
-                .setTitle(getString(R.string.unlock_prompt_title))
-                .setSubtitle(getString(R.string.unlock_prompt_subtitle))
-                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-                .setNegativeButtonText(getString(R.string.cancel))
-                .setConfirmationRequired(false)
-                .build()
-            prompt.authenticate(info, BiometricPrompt.CryptoObject(cipher))
-        } catch (_: KeyPermanentlyInvalidatedException) {
-            showVaultResetDialog()
-        } catch (error: GeneralSecurityException) {
-            viewModel.setError(error.message ?: getString(R.string.unlock_failed))
-        }
+        override fun onNotProvisioned() = Unit // enrollment is allowed here
+        override fun onKeyInvalidated() = showVaultResetDialog()
+        override fun onAuthenticationError(code: Int, message: CharSequence) = viewModel.setError(message.toString())
+        override fun onAuthenticationFailed() = viewModel.setError(getString(R.string.biometric_failed))
+        override fun onOpening() = viewModel.setBusy(true)
+        override fun onOpened(imported: Int) { viewModel.onVaultOpened(imported); restartCaptureIfEnabled() }
+        override fun onFailure(message: String) = viewModel.setError(message)
     }
 
-    private fun finishBiometricUnlock(cipher: Cipher, enrollment: Boolean) {
-        viewModel.setBusy(true)
-        app.io().execute {
-            var databaseKey: ByteArray? = null
-            try {
-                databaseKey = if (enrollment) keyManager.finishEnrollment(cipher) else keyManager.finishUnlock(cipher)
-                val imported = app.openVault(databaseKey)
-                databaseKey = null
-                runOnUiThread { viewModel.onVaultOpened(imported); restartCaptureIfEnabled() }
-            } catch (error: GeneralSecurityException) {
-                databaseKey?.fill(0)
-                runOnUiThread { viewModel.setError(error.message ?: getString(R.string.unlock_failed)) }
-            } catch (error: RuntimeException) {
-                databaseKey?.fill(0)
-                runOnUiThread { viewModel.setError(error.message ?: getString(R.string.unlock_failed)) }
-            }
-        }
-    }
-
-    private fun lockVault() {
-        mainHandler.removeCallbacks(autoLock)
-        if (!app.isUnlocked) return
-        app.lockVault()
-        viewModel.onVaultLocked()
-    }
+    private fun lockVault() = app.lockVault()
 
     private fun toggleCapture() {
         if (captureEnabled) {
@@ -267,14 +213,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun copyToClipboard(item: ClipItem) {
-        val manager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("ClipVault", item.content)
-        val extras = PersistableBundle().apply {
-            putBoolean(if (Build.VERSION.SDK_INT >= 33) ClipDescription.EXTRA_IS_SENSITIVE
-            else "android.content.extra.IS_SENSITIVE", true)
-        }
-        clip.description.extras = extras
-        manager.setPrimaryClip(clip)
+        SensitiveClipboard.write(this, item.content)
         Toast.makeText(this, R.string.clipboard_copied, Toast.LENGTH_SHORT).show()
     }
 
@@ -447,25 +386,17 @@ class MainActivity : AppCompatActivity() {
         Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
     }
 
-    override fun onStart() { super.onStart(); mainHandler.removeCallbacks(autoLock) }
     override fun onResume() {
         super.onResume()
         updateCaptureState()
         if (getSystemService(KeyguardManager::class.java).isDeviceLocked) lockVault()
-        if (app.isUnlocked) viewModel.refresh() else viewModel.onVaultLocked()
-    }
-    override fun onStop() {
-        super.onStop()
-        if (!isChangingConfigurations && app.isUnlocked) {
-            val timeout = app.settings().getLong(ClipVaultApp.PREF_AUTO_LOCK_MS, 30_000L)
-            mainHandler.postDelayed(autoLock, timeout.coerceIn(0L, 300_000L))
-        }
+        // The vault may have been unlocked from QuickPaste while this window was in the background.
+        if (app.isUnlocked) viewModel.onVaultAvailable() else viewModel.onVaultLocked()
     }
 
     override fun onDestroy() {
-        mainHandler.removeCallbacksAndMessages(null)
+        app.removeLockListener(vaultLockListener)
         unregisterReceiver(dataChangedReceiver)
-        unregisterReceiver(securityReceiver)
         Shizuku.removeBinderReceivedListener(shizukuBinderListener)
         Shizuku.removeBinderDeadListener(shizukuDeadListener)
         Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)

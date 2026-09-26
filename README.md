@@ -17,6 +17,7 @@ ClipVault is an offline-first encrypted clipboard archive for Android. It captur
 - Exports and imports versioned `.cvault` files protected with Argon2id and AES-256-GCM.
 - Offers System, Light, Dark and AMOLED themes, Android 12+ Dynamic Color, six accent palettes and live preview.
 - Supports Persian RTL and English LTR layouts.
+- Quick paste window for DeX and hardware keyboards: long-press the app icon (or the DeX taskbar icon) → **Quick paste**, type to search, ↑/↓ to pick, Enter to copy, Esc to close, then Ctrl+V in the original app. It never pastes by itself.
 
 ClipVault has no `INTERNET` permission, analytics, account system, cloud sync or telemetry.
 

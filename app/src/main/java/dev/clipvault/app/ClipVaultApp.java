@@ -1,12 +1,19 @@
 package dev.clipvault.app;
 
+import android.app.Activity;
 import android.app.Application;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
@@ -17,6 +24,7 @@ import dev.clipvault.app.data.VaultRepository;
 import dev.clipvault.app.nativecore.NativeClassifier;
 import dev.clipvault.app.nativecore.TextAnalysis;
 import dev.clipvault.app.security.SecurePendingStore;
+import dev.clipvault.app.security.VaultAutoLock;
 import dev.clipvault.app.workers.RetentionWorker;
 
 import rikka.shizuku.ShizukuProvider;
@@ -24,6 +32,7 @@ import rikka.shizuku.ShizukuProvider;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -56,6 +65,9 @@ public final class ClipVaultApp extends Application {
     private SharedPreferences settings;
     private final CaptureRuleEngine ruleEngine = new CaptureRuleEngine();
     private AppContainer container;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final List<Runnable> lockListeners = new CopyOnWriteArrayList<>();
+    private VaultAutoLock autoLock;
 
     @Override
     protected void attachBaseContext(Context base) {
@@ -71,7 +83,51 @@ public final class ClipVaultApp extends Application {
         pendingStore = new SecurePendingStore(this);
         settings = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         container = new AppContainer(this);
+        installAutoLock();
         scheduleRetentionMaintenance();
+    }
+
+    private void installAutoLock() {
+        autoLock = new VaultAutoLock(new VaultAutoLock.Scheduler() {
+            @Override
+            public void schedule(@NonNull Runnable task, long delayMs) {
+                mainHandler.postDelayed(task, delayMs);
+            }
+
+            @Override
+            public void cancel(@NonNull Runnable task) {
+                mainHandler.removeCallbacks(task);
+            }
+        }, () -> settings.getLong(PREF_AUTO_LOCK_MS, VaultAutoLock.DEFAULT_DELAY_MS), this::isUnlocked, this::lockVault);
+        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+            @Override public void onActivityStarted(@NonNull Activity activity) { autoLock.onActivityStarted(); }
+            @Override public void onActivityStopped(@NonNull Activity activity) {
+                autoLock.onActivityStopped(activity.isChangingConfigurations());
+            }
+            @Override public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle state) { }
+            @Override public void onActivityResumed(@NonNull Activity activity) { }
+            @Override public void onActivityPaused(@NonNull Activity activity) { }
+            @Override public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle state) { }
+            @Override public void onActivityDestroyed(@NonNull Activity activity) { }
+        });
+        // Screen off locks immediately whichever ClipVault window (or none) unlocked the vault.
+        // SCREEN_OFF is a protected system broadcast; EXPORTED keeps pre-33 delivery identical to
+        // the old MainActivity receiver (NOT_EXPORTED adds a permission requirement below API 33).
+        ContextCompat.registerReceiver(this, new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) lockVault();
+            }
+        }, new IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_EXPORTED);
+    }
+
+    /** Listeners run on the main thread after the vault has been marked locked. */
+    public void addLockListener(@NonNull Runnable listener) {
+        lockListeners.add(listener);
+    }
+
+    public void removeLockListener(@NonNull Runnable listener) {
+        lockListeners.remove(listener);
     }
 
     @NonNull
@@ -153,6 +209,7 @@ public final class ClipVaultApp extends Application {
         return imported;
     }
 
+    /** Idempotent; any thread. Lock listeners always run so every window drops decrypted state. */
     public void lockVault() {
         unlocked = false;
         ioExecutor.execute(() -> {
@@ -160,6 +217,12 @@ public final class ClipVaultApp extends Application {
             repository = null;
             if (closing != null) closing.close();
         });
+        Runnable notify = () -> {
+            if (autoLock != null) autoLock.onVaultLocked();
+            for (Runnable listener : lockListeners) listener.run();
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) notify.run();
+        else mainHandler.post(notify);
     }
 
     /** Irreversibly removes vault and staging data after explicit UI confirmation. Call on the IO executor. */

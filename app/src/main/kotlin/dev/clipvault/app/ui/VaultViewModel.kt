@@ -155,6 +155,11 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         refreshMetadata()
     }
 
+    /** The vault is open (possibly unlocked by another ClipVault window); show it without re-authenticating. */
+    fun onVaultAvailable() {
+        if (mutableState.value.unlocked) refresh() else onVaultOpened(0)
+    }
+
     fun onVaultLocked() {
         mutableState.value = VaultUiState(unlocked = false, pendingCount = app.pending().count())
     }
