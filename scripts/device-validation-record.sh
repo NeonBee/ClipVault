@@ -42,12 +42,29 @@ LAST_ERROR=$(pref last_capture_error)
 TEST_RESULT="실행 안 함(--run-test 로 실행)"
 if [ "$RUN_TEST" -eq 1 ]; then
     ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
-    if "$ROOT/gradlew" -p "$ROOT" --no-daemon -q connectedDebugAndroidTest \
+    RESULTS="$ROOT/app/build/outputs/androidTest-results/connected"
+    # 이전 실행의 XML 이 결과로 섞이지 않게 지운다.
+    rm -rf "$RESULTS"
+    GRADLE_OK=1
+    "$ROOT/gradlew" -p "$ROOT" --no-daemon -q connectedDebugAndroidTest \
         -Pandroid.testInstrumentationRunnerArguments.class=dev.clipvault.app.clipboard.ShizukuRealDeviceInstrumentedTest \
-        >/dev/null 2>&1; then
-        TEST_RESULT="PASS (Shizuku 가 없거나 root 면 skip 될 수 있음: app/build/reports/androidTests 확인)"
+        >/dev/null 2>&1 || GRADLE_OK=0
+    # Assume 로 skip 된 테스트도 Gradle 은 성공으로 끝나므로, XML 의 실행·skip·실패 수로 판정한다.
+    XML=$(find "$RESULTS" -name 'TEST-*.xml' 2>/dev/null | head -1)
+    if [ -z "$XML" ]; then
+        TEST_RESULT="FAIL (결과 XML 없음, Gradle 성공=$GRADLE_OK)"
     else
-        TEST_RESULT="FAIL (app/build/reports/androidTests/connected 확인)"
+        attr() { sed -n "s/.*<testsuite[^>]* $1=\"\([0-9]*\)\".*/\1/p" "$XML" | head -1; }
+        TESTS=$(attr tests); SKIPPED=$(attr skipped); FAILURES=$(attr failures); ERRORS=$(attr errors)
+        EXECUTED=$(( ${TESTS:-0} - ${SKIPPED:-0} ))
+        COUNTS="실행 $EXECUTED, skip ${SKIPPED:-0}, 실패 $(( ${FAILURES:-0} + ${ERRORS:-0} ))"
+        if [ $(( ${FAILURES:-0} + ${ERRORS:-0} )) -gt 0 ] || [ "$GRADLE_OK" -eq 0 ]; then
+            TEST_RESULT="FAIL ($COUNTS)"
+        elif [ "$EXECUTED" -eq 0 ]; then
+            TEST_RESULT="SKIPPED ($COUNTS: Shizuku 미실행·권한 없음 등으로 bridge 검증 0건)"
+        else
+            TEST_RESULT="PASS ($COUNTS)"
+        fi
     fi
 fi
 

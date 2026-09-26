@@ -54,7 +54,9 @@ scripts/device-validation-record.sh --run-test
 ```
 
 The script prints a markdown table (model, Android/API, One UI, build, security patch, Shizuku server
-user, bridge mode, last sanitized error, real-device test result). It reads no clipboard content.
+user, bridge mode, last sanitized error, real-device test result as PASS / SKIPPED / FAIL from the
+connected-test XML, so a run where every test was skipped by `Assume` is not reported as PASS). It
+reads no clipboard content.
 Replace this section's table with its output. For a release build, read **Bridge mode** and
 **Android build** from Settings > Diagnostics instead.
 

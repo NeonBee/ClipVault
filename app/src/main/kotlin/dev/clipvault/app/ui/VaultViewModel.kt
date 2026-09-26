@@ -1,6 +1,7 @@
 package dev.clipvault.app.ui
 
 import android.app.Application
+import android.content.SharedPreferences
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
@@ -116,8 +117,33 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
         .cachedIn(viewModelScope)
 
+    /**
+     * The capture service writes bridge health asynchronously (after unlock it starts only once
+     * refreshMetadata() already ran), so Diagnostics observes these keys instead of reading them
+     * once. Held in a field: SharedPreferences keeps listeners weakly.
+     */
+    private val bridgePreferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == null || key == ClipVaultApp.PREF_BRIDGE_STATE || key == ClipVaultApp.PREF_LAST_CAPTURE_ERROR) {
+            publishBridgeDiagnostics()
+        }
+    }
+
     init {
+        publishBridgeDiagnostics()
+        app.settings().registerOnSharedPreferenceChangeListener(bridgePreferenceListener)
         if (app.isUnlocked) refreshMetadata()
+    }
+
+    override fun onCleared() {
+        app.settings().unregisterOnSharedPreferenceChangeListener(bridgePreferenceListener)
+        super.onCleared()
+    }
+
+    private fun publishBridgeDiagnostics() {
+        val settings = app.settings()
+        val bridgeState = settings.getString(ClipVaultApp.PREF_BRIDGE_STATE, "").orEmpty()
+        val captureError = settings.getString(ClipVaultApp.PREF_LAST_CAPTURE_ERROR, "").orEmpty()
+        mutableState.update { it.copy(bridgeState = bridgeState, lastCaptureError = captureError) }
     }
 
     fun onVaultOpened(imported: Int) {
@@ -326,13 +352,11 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                 val nextRules = repository.rules()
                 val pending = app.pending().count()
                 val lastCapture = app.settings().getLong(ClipVaultApp.PREF_LAST_CAPTURE_AT, 0L)
-                val captureError = app.settings().getString(ClipVaultApp.PREF_LAST_CAPTURE_ERROR, "").orEmpty()
-                val bridgeState = app.settings().getString(ClipVaultApp.PREF_BRIDGE_STATE, "").orEmpty()
                 val autoLock = app.settings().getLong(ClipVaultApp.PREF_AUTO_LOCK_MS, 30_000L)
                 mutableState.update {
                     it.copy(stats = nextStats, collections = nextCollections, tags = nextTags,
                         rules = nextRules, pendingCount = pending, lastCaptureAt = lastCapture,
-                        lastCaptureError = captureError, bridgeState = bridgeState, autoLockMs = autoLock)
+                        autoLockMs = autoLock)
                 }
             } catch (error: RuntimeException) {
                 mutableState.update { it.copy(error = error.message ?: "Could not read the vault") }
