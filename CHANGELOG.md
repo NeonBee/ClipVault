@@ -9,6 +9,7 @@
 - Marked `gradlew` executable in git so CI `./gradlew` steps no longer fail with exit code 126.
 - Moved CI to `android-actions/setup-android@v4` with SDK packages passed as action input; v3 failed on current runners installing the removed `tools` package. Enabled KVM for the emulator job so instrumentation tests no longer run on a software-only emulator.
 - Added Settings > Diagnostics rows for bridge mode (`READY_EVENT` / `READY_POLL` / `DEGRADED:<reason>`) and Android build, plus `scripts/device-validation-record.ps1` (Windows PowerShell 5.1 / 7) to collect device validation records without reading clipboard content. Its `-RunTest` installs with `adb install -r` and runs `am instrument`; it never uninstalls or clears the app.
+- Fixed Diagnostics rows squeezing the label into a one-character column when the value is long (e.g. Android build); label and value now share the row by weight.
 
 ## 2.0.0
 

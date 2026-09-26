@@ -40,16 +40,17 @@ The code under test includes:
 | Screen lock / unlock | PASS | Capture behavior after screen lock/unlock matched the expected bridge lifecycle and recovered normally. |
 | Doze / wake | PASS | Capture recovered and continued normally after the device entered an idle/sleep state and woke. |
 | Oversized payload rejection (>128,000 UTF-16 chars) | PASS | The oversized clipboard payload was rejected as designed rather than persisted/truncated. |
-| READY_EVENT vs READY_POLL | PENDING RECORD | The original session could not observe it because the Settings UI only showed Shizuku Ready/Offline. Diagnostics now show **Bridge mode**; the value is recorded below after re-collection on the device. Functional capture is confirmed, so this is non-blocking for WP-04. |
+| READY_EVENT vs READY_POLL | PASS | Recorded 2026-09-26 on the same device: bridge mode `READY_EVENT` (event listener registered via the API 34+ signature); polling remains the 30 s watchdog. |
 
 ## Device record
 
-Status: **PARTIAL** — device properties are recorded; the bridge mode and the real-device test are
-still **PENDING**. Both matter because the exact hidden-`IClipboard` signature table differs by API
+Status: **COMPLETE** — device properties, Shizuku backend, bridge mode and the real-device bridge test
+are recorded. They matter because the exact hidden-`IClipboard` signature table differs by API
 level (API 34+ uses the 4-argument `getPrimaryClip`), and the design's WP-04 checklist separates the
 event listener from the polling fallback.
 
-Collected 2026-09-26T17:35Z from the same Galaxy S23 Ultra with `scripts\device-validation-record.ps1`:
+Collected 2026-09-26 from the same Galaxy S23 Ultra with `scripts\device-validation-record.ps1 -RunTest`
+(PR #9 version: `adb install -r` + `am instrument`, app data kept):
 
 | Item | Value |
 | --- | --- |
@@ -58,11 +59,12 @@ Collected 2026-09-26T17:35Z from the same Galaxy S23 Ultra with `scripts\device-
 | One UI | 8.0 (80000) |
 | Build | BP2A.250605.031.A3.S918NKSS7EZCI |
 | Security patch | 2026-04-05 |
-| Shizuku server user | PENDING (the collection run is invalid, see below) |
-| Bridge mode | PENDING (`READY_EVENT` expected when the listener signature resolves; `READY_POLL:<reason>` means polling fallback) |
-| ShizukuRealDeviceInstrumentedTest | PENDING |
+| Shizuku server user | shell (UID 2000 backend accepted; root/Sui not in use) |
+| Bridge mode | READY_EVENT (hidden `IOnPrimaryClipChangedListener` registered; no polling-only fallback needed) |
+| Last sanitized error | none |
+| ShizukuRealDeviceInstrumentedTest | PASS (executed 1, skipped 1, failed 0): the shell-backend probe passed; the root-refusal test is skipped by design on a shell backend |
 
-### Why the 2026-09-26 bridge values are invalid
+### Earlier invalid collection run (2026-09-26T17:35Z)
 
 The first version of the script (PR #8) had two defects:
 
@@ -136,7 +138,7 @@ Non-blocking diagnostic follow-up:
 
 - [x] Expose `READY_EVENT` / `READY_POLL` explicitly: Settings > Diagnostics shows **Bridge mode** and **Android build**.
 - [x] Record the Android / One UI version the validation ran on (see "Device record").
-- [ ] Record the observed bridge mode (see "Device record").
+- [x] Record the observed bridge mode (see "Device record"): `READY_EVENT`.
 
 ## Decision
 
