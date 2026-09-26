@@ -53,6 +53,10 @@ public class BridgeHealthTest {
         assertEquals("CAPTURE_REJECTED_TOO_LARGE", health.diagnosticCode());
         assertFalse(ClipboardBridgeProtocol.isApiFailure(ClipboardBridgeProtocol.TRANSACTION_TOO_LARGE));
         assertTrue(ClipboardBridgeProtocol.isApiFailure(ClipboardBridgeProtocol.SECURITY_EXCEPTION));
+        assertTrue(ClipboardBridgeProtocol.isApiFailure(ClipboardBridgeProtocol.GET_PRIMARY_CLIP_SIGNATURE_UNSUPPORTED));
+        // A single failed invocation (odd ClipData, dead reply) is transient, not an API break.
+        assertFalse(ClipboardBridgeProtocol.isApiFailure(ClipboardBridgeProtocol.INVOCATION_FAILED));
+        assertTrue(ClipboardBridgeProtocol.isTransientReadFailure(ClipboardBridgeProtocol.INVOCATION_FAILED));
     }
 
     @Test

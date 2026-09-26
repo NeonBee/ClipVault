@@ -30,6 +30,7 @@ import android.os.RemoteException;
 import android.os.TransactionTooLargeException;
 
 import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.lang.reflect.InvocationTargetException;
@@ -98,25 +99,51 @@ public final class PrivilegedClipboardService extends IClipboardBridge.Stub {
     }
 
     @Override
-    public String readText() {
-        if (admit(Binder.getCallingUid()) != OK) return null;
-        return readForBoundUser();
+    public String readText(int[] error) {
+        int admission = admit(Binder.getCallingUid());
+        if (admission != OK) {
+            report(error, admission);
+            return null;
+        }
+        ReadResult result = readForBoundUser();
+        report(error, result.error);
+        return result.text;
     }
 
     @Override
-    public int probeCapabilities() {
-        if (admit(Binder.getCallingUid()) != OK) return 0;
+    public int probeCapabilities(int[] error) {
+        int admission = admit(Binder.getCallingUid());
+        if (admission != OK) {
+            report(error, admission);
+            return 0;
+        }
         synchronized (apiLock) {
             int capabilities = CAP_PAYLOAD_LIMIT;
             int listenerError = ensureSystemListener();
             if (systemListenerRegistered) capabilities |= CAP_EVENT_LISTENER;
-            readForBoundUser();
-            int readError = lastError;
+            int readError = readForBoundUser().error;
             // An oversized current clip still proves that the API works.
             if (readError == OK || readError == TRANSACTION_TOO_LARGE) capabilities |= CAP_READ | CAP_POLL_FALLBACK;
             if (readBinding != null && readBinding.isUserScoped()) capabilities |= CAP_USER_SCOPED;
-            lastError = readError != OK ? readError : listenerError;
+            int probeError = readError != OK ? readError : listenerError;
+            lastError = probeError;
+            report(error, probeError);
             return capabilities;
+        }
+    }
+
+    private static void report(@Nullable int[] error, int code) {
+        if (error != null && error.length > 0) error[0] = code;
+    }
+
+    /** One read and its own error code; never shared between threads. */
+    private static final class ReadResult {
+        @Nullable final String text;
+        final int error;
+
+        ReadResult(@Nullable String text, int error) {
+            this.text = text;
+            this.error = error;
         }
     }
 
@@ -166,36 +193,32 @@ public final class PrivilegedClipboardService extends IClipboardBridge.Stub {
     }
 
     /** Runs for the stored caller user, also on system_server callback threads. */
-    @Nullable
-    private String readForBoundUser() {
+    @NonNull
+    private ReadResult readForBoundUser() {
         synchronized (apiLock) {
-            int error = ensureResolved();
-            if (error != OK) {
-                lastError = error;
-                return null;
+            ReadResult result = readLocked();
+            lastError = result.error;
+            return result;
+        }
+    }
+
+    @NonNull
+    private ReadResult readLocked() {
+        int error = ensureResolved();
+        if (error != OK) return new ReadResult(null, error);
+        int userId = ClipboardBridgeProtocol.userIdOf(boundUid);
+        if (!readBinding.isUserScoped() && userId != 0) return new ReadResult(null, USER_SCOPE_UNSUPPORTED);
+        try {
+            String text = extractText(readBinding.invoke(clipboard, userId, null));
+            if (text != null && ClipboardBridgeProtocol.exceedsPayloadLimit(text)) {
+                // Reject instead of truncating: a stored clip must equal what the user copied.
+                return new ReadResult(null, TRANSACTION_TOO_LARGE);
             }
-            int userId = ClipboardBridgeProtocol.userIdOf(boundUid);
-            if (!readBinding.isUserScoped() && userId != 0) {
-                lastError = USER_SCOPE_UNSUPPORTED;
-                return null;
-            }
-            try {
-                Object result = readBinding.invoke(clipboard, userId, null);
-                String text = extractText(result);
-                if (text != null && ClipboardBridgeProtocol.exceedsPayloadLimit(text)) {
-                    // Reject instead of truncating: a stored clip must equal what the user copied.
-                    lastError = TRANSACTION_TOO_LARGE;
-                    return null;
-                }
-                lastError = OK;
-                return text;
-            } catch (InvocationTargetException error2) {
-                lastError = classify(error2.getCause());
-                return null;
-            } catch (IllegalAccessException | RuntimeException error2) {
-                lastError = classify(error2);
-                return null;
-            }
+            return new ReadResult(text, OK);
+        } catch (InvocationTargetException error2) {
+            return new ReadResult(null, classify(error2.getCause()));
+        } catch (IllegalAccessException | RuntimeException error2) {
+            return new ReadResult(null, classify(error2));
         }
     }
 
@@ -277,7 +300,7 @@ public final class PrivilegedClipboardService extends IClipboardBridge.Stub {
 
     private void dispatchClipboardChanged() {
         if (destroyed) return;
-        String text = readForBoundUser();
+        String text = readForBoundUser().text;
         int count = listeners.beginBroadcast();
         try {
             for (int index = 0; index < count; index++) {

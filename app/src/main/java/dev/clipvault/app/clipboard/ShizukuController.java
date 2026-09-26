@@ -32,6 +32,11 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
 
     private static final long INITIAL_RETRY_MS = 1_000L;
     private static final long MAX_RETRY_MS = 60_000L;
+    /** A DEGRADED bridge is re-probed at least this often so capture resumes quickly. */
+    private static final long MAX_REPROBE_MS = 15_000L;
+    private static final long BIND_TIMEOUT_MS = 15_000L;
+    /** Consecutive transient read failures (INVOCATION_FAILED) before the bridge is DEGRADED. */
+    private static final int TRANSIENT_FAILURE_LIMIT = 3;
 
     private final Shizuku.UserServiceArgs serviceArgs;
     private final StateListener listener;
@@ -44,6 +49,8 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
     private long retryDelayMs = INITIAL_RETRY_MS;
     private final Runnable reconnect = this::tryBind;
     private final Runnable reprobe = this::reprobe;
+    private final Runnable bindTimeout = this::onBindTimeout;
+    private volatile int transientFailures;
 
     private final IClipboardListener remoteListener = new IClipboardListener.Stub() {
         @Override
@@ -54,6 +61,7 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
 
     private final Shizuku.OnBinderReceivedListener binderReceivedListener = this::tryBind;
     private final Shizuku.OnBinderDeadListener binderDeadListener = () -> mainHandler.post(() -> {
+        if (!started) return;
         bridge = null;
         binding = false;
         publish(BridgeHealth.of(BridgeHealth.State.NO_SHIZUKU));
@@ -63,7 +71,9 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder binder) {
+            mainHandler.removeCallbacks(bindTimeout);
             binding = false;
+            if (!started) return;
             IClipboardBridge candidate = IClipboardBridge.Stub.asInterface(binder);
             try {
                 if (candidate == null) throw new RemoteException("Null bridge");
@@ -85,8 +95,10 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
+            mainHandler.removeCallbacks(bindTimeout);
             bridge = null;
             binding = false;
+            if (!started) return;
             publish(BridgeHealth.of(BridgeHealth.State.NO_SHIZUKU));
             scheduleReconnect();
         }
@@ -142,14 +154,17 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
         IClipboardBridge current = bridge;
         if (current == null || !health.isReady()) return null;
         try {
-            String text = current.readText();
-            int error = text == null ? current.lastErrorCode() : ClipboardBridgeProtocol.OK;
-            if (error != ClipboardBridgeProtocol.OK || health.errorCode != ClipboardBridgeProtocol.OK) {
+            int[] result = new int[1];
+            String text = current.readText(result);
+            int error = result[0];
+            if (error != ClipboardBridgeProtocol.OK || health.errorCode != ClipboardBridgeProtocol.OK
+                    || transientFailures != 0) {
                 mainHandler.post(() -> onReadResult(current, error));
             }
             return text;
         } catch (RemoteException error) {
             mainHandler.post(() -> {
+                if (!started) return;
                 if (bridge == current) bridge = null;
                 publish(BridgeHealth.of(BridgeHealth.State.NO_SHIZUKU));
                 scheduleReconnect();
@@ -159,22 +174,30 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
     }
 
     private void onReadResult(@NonNull IClipboardBridge source, int error) {
-        if (bridge != source || !health.isReady()) return;
-        if (ClipboardBridgeProtocol.isApiFailure(error)) {
+        if (!started || bridge != source || !health.isReady()) return;
+        if (ClipboardBridgeProtocol.isTransientReadFailure(error)) {
+            // One odd clip must not stop capture; only a persistent failure degrades the bridge.
+            if (++transientFailures < TRANSIENT_FAILURE_LIMIT) return;
+        }
+        if (ClipboardBridgeProtocol.isApiFailure(error) || ClipboardBridgeProtocol.isTransientReadFailure(error)) {
+            transientFailures = 0;
             publish(BridgeHealth.degraded(error));
             scheduleReprobe();
         } else {
+            transientFailures = 0;
             publish(health.withError(error));
         }
     }
 
     private void probe(@NonNull IClipboardBridge candidate) throws RemoteException {
         publish(BridgeHealth.of(BridgeHealth.State.API_PROBING));
-        int capabilities = candidate.probeCapabilities();
-        BridgeHealth next = BridgeHealth.fromProbe(capabilities, candidate.lastErrorCode());
+        int[] error = new int[1];
+        int capabilities = candidate.probeCapabilities(error);
+        BridgeHealth next = BridgeHealth.fromProbe(capabilities, error[0]);
         if (next.isEventDriven() && !candidate.registerListener(remoteListener)) next = next.withoutEvents();
         publish(next);
         if (next.isReady()) {
+            transientFailures = 0;
             mainHandler.removeCallbacks(reconnect);
             mainHandler.removeCallbacks(reprobe);
             retryDelayMs = INITIAL_RETRY_MS;
@@ -220,12 +243,27 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
                 return;
             }
             binding = true;
+            mainHandler.postDelayed(bindTimeout, BIND_TIMEOUT_MS);
             Shizuku.bindUserService(serviceArgs, connection);
         } catch (RuntimeException error) {
+            mainHandler.removeCallbacks(bindTimeout);
             binding = false;
             publish(BridgeHealth.of(BridgeHealth.State.NO_SHIZUKU));
             scheduleReconnect();
         }
+    }
+
+    /** The UserService never attached (spawn failure, early crash): drop the attempt and retry. */
+    private void onBindTimeout() {
+        if (!started || !binding) return;
+        binding = false;
+        try {
+            Shizuku.unbindUserService(serviceArgs, connection, true);
+        } catch (RuntimeException ignored) {
+            // Shizuku may already be stopped.
+        }
+        publish(BridgeHealth.of(BridgeHealth.State.NO_SHIZUKU));
+        scheduleReconnect();
     }
 
     private void scheduleReconnect() {
@@ -240,12 +278,12 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
         if (!started) return;
         mainHandler.removeCallbacks(reconnect);
         mainHandler.removeCallbacks(reprobe);
-        mainHandler.postDelayed(action, retryDelayMs);
+        mainHandler.postDelayed(action, action == reprobe ? Math.min(retryDelayMs, MAX_REPROBE_MS) : retryDelayMs);
         retryDelayMs = Math.min(retryDelayMs * 2L, MAX_RETRY_MS);
     }
 
     private void publish(@NonNull BridgeHealth next) {
-        if (next.equals(health)) return;
+        if (!started || next.equals(health)) return;
         health = next;
         if (listener != null) listener.onStateChanged(next);
     }
@@ -256,6 +294,7 @@ public final class ShizukuController implements ClipboardBridge, AutoCloseable {
         started = false;
         mainHandler.removeCallbacks(reconnect);
         mainHandler.removeCallbacks(reprobe);
+        mainHandler.removeCallbacks(bindTimeout);
         Shizuku.removeBinderReceivedListener(binderReceivedListener);
         Shizuku.removeBinderDeadListener(binderDeadListener);
         try {

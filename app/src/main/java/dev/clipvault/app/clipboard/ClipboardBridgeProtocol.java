@@ -73,8 +73,16 @@ public final class ClipboardBridgeProtocol {
         return text.length() > MAX_BRIDGE_CHARS;
     }
 
-    /** Errors that mean the hidden clipboard API itself is unusable, as opposed to one bad clip. */
+    /**
+     * Errors that mean the hidden clipboard API itself is unusable, as opposed to one bad clip.
+     * {@link #INVOCATION_FAILED} is transient per read: an odd ClipData parcel or a reply that
+     * dies in transit must not stall capture; callers degrade only after repeated failures.
+     */
     public static boolean isApiFailure(int code) {
-        return code != OK && code != TRANSACTION_TOO_LARGE;
+        return code != OK && code != TRANSACTION_TOO_LARGE && code != INVOCATION_FAILED;
+    }
+
+    public static boolean isTransientReadFailure(int code) {
+        return code == INVOCATION_FAILED;
     }
 }
