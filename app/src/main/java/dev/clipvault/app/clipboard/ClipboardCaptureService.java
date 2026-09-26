@@ -44,11 +44,12 @@ public final class ClipboardCaptureService extends Service {
         createNotificationChannel();
         clipboardManager = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         clipboardManager.addPrimaryClipChangedListener(localListener);
-        coordinator = new ClipboardCaptureCoordinator(text ->
-                ((ClipVaultApp) getApplication()).capture(text, System.currentTimeMillis()));
-        shizukuController = new ShizukuController(this, ready -> {
-            getSharedPreferences(ClipVaultApp.PREFS, MODE_PRIVATE).edit()
-                    .putString(ClipVaultApp.PREF_LAST_CAPTURE_ERROR, ready ? "" : "bridge_unavailable").apply();
+        coordinator = new ClipboardCaptureCoordinator(
+                text -> ((ClipVaultApp) getApplication()).capture(text, System.currentTimeMillis()),
+                error -> recordCaptureError(BridgeHealth.of(BridgeHealth.State.READY_POLL)
+                        .withError(error).diagnosticCode()));
+        shizukuController = new ShizukuController(this, health -> {
+            recordCaptureError(health.diagnosticCode());
             updateNotification();
         }, coordinator::accept);
         shizukuController.start();
@@ -82,6 +83,12 @@ public final class ClipboardCaptureService extends Service {
             startForeground(NOTIFICATION_ID, notification);
         }
         return START_STICKY;
+    }
+
+    /** Stores a sanitized state identifier only; clipboard text never reaches preferences or logs. */
+    private void recordCaptureError(String code) {
+        getSharedPreferences(ClipVaultApp.PREFS, MODE_PRIVATE).edit()
+                .putString(ClipVaultApp.PREF_LAST_CAPTURE_ERROR, code).apply();
     }
 
     private void pollPrivilegedClipboard() {
@@ -123,9 +130,7 @@ public final class ClipboardCaptureService extends Service {
         PendingIntent lockPendingIntent = PendingIntent.getService(
                 this, 3, lockIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        String status = shizukuController != null && shizukuController.isReady()
-                ? getString(R.string.capture_notification_body)
-                : getString(R.string.shizuku_offline);
+        String status = captureStatus();
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_vault)
                 .setContentTitle(getString(R.string.capture_notification_title))
@@ -138,6 +143,19 @@ public final class ClipboardCaptureService extends Service {
                 .addAction(R.drawable.ic_lock, getString(R.string.lock_now), lockPendingIntent)
                 .addAction(R.drawable.ic_bolt, getString(R.string.disable_capture), stopPendingIntent)
                 .build();
+    }
+
+    private String captureStatus() {
+        if (shizukuController == null) return getString(R.string.shizuku_offline);
+        BridgeHealth health = shizukuController.health();
+        if (health.isReady()) return getString(R.string.capture_notification_body);
+        switch (health.state) {
+            case NO_SHIZUKU:
+            case PERMISSION_REQUIRED:
+                return getString(R.string.shizuku_offline);
+            default:
+                return getString(R.string.bridge_unavailable) + " · " + health.diagnosticCode();
+        }
     }
 
     private void updateNotification() {

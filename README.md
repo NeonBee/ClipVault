@@ -24,7 +24,7 @@ ClipVault has no `INTERNET` permission, analytics, account system, cloud sync or
 
 ```mermaid
 flowchart LR
-    C[Android clipboard] --> S[Shizuku UserService v2]
+    C[Android clipboard] --> S[Shizuku UserService v3, shell only]
     S --> F[Foreground capture service]
     F --> A[C++ text analysis]
     A --> L{Vault unlocked?}
@@ -66,7 +66,7 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Release
 ## Device setup
 
 1. Enroll a strong fingerprint or other `BIOMETRIC_STRONG` credential.
-2. Install and start [Shizuku](https://shizuku.rikka.app/guide/setup/) using wireless debugging, ADB or root.
+2. Install and start [Shizuku](https://shizuku.rikka.app/guide/setup/) using wireless debugging or ADB. Root and Sui backends are refused because clipboard access only needs the shell identity.
 3. Install the APK with `adb install -r app/build/outputs/apk/debug/app-debug.apk`.
 4. Open ClipVault and create the biometric-protected vault.
 5. Grant the Shizuku and notification permissions, then enable capture in Settings or the Quick Settings tile.

@@ -5,6 +5,7 @@
 - Pinned the audit baseline at upstream `ee1f24af3010dd26be7d95545ea9dbf0fd703622` (ClipVault 2.0.0).
 - Updated SQLCipher Android from 4.17.0 to 4.19.0 stable.
 - Moved the vault to schema v3: FTS5 `secure-delete` is enabled, v2 indexes are rebuilt and the WAL is truncated so deleted clips leave no terms in FTS shadow tables. Added forensic deletion instrumentation tests.
+- Replaced the Shizuku bridge with protocol v3: shell-UID-only backend with Sui auto-init disabled, per-user UserService tags and single-caller binding, exact AOSP signature adapters for `getPrimaryClip` and `addPrimaryClipChangedListener`, capability probe, structured error codes, a `BridgeHealth` state machine shown in diagnostics and the notification, and a 128,000-char payload limit that rejects instead of truncating.
 - Marked `gradlew` executable in git so CI `./gradlew` steps no longer fail with exit code 126.
 
 ## 2.0.0
