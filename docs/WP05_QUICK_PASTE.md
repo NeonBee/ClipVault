@@ -25,7 +25,7 @@ Entry point: a dynamic launcher shortcut "Quick paste" (long-press the app icon,
 
 Related fix: auto-lock and screen-off lock moved from `MainActivity` to `ClipVaultApp` (`VaultAutoLock`). Before this, opening QuickPaste over the main window armed MainActivity's timer and could lock the vault underneath QuickPaste, and a vault unlocked from QuickPaste alone would not auto-lock.
 
-Unlock race (review of PR #11): the database opens on the IO executor after the biometric prompt, so the window can stop while the vault is still locked. `openVault` therefore calls `VaultAutoLock.onVaultUnlocked()`, which arms the timer when no window is visible. Every `lockVault()` bumps a lock epoch; `BiometricVaultUnlock` captures it before the prompt and `openVault(key, epoch)` refuses (wiping the key) if a screen-off, keyguard or explicit lock happened in between, both before and after SQLCipher opens.
+Unlock race (review of PR #11): the database opens on the IO executor after the biometric prompt, so the window can stop while the vault is still locked. `openVault` therefore calls `VaultAutoLock.onVaultUnlocked()`, which arms the timer when no window is visible. Every `lockVault()` bumps a lock epoch; `BiometricVaultUnlock` captures it before the prompt and `openVault(key, epoch)` refuses (wiping the key) if a screen-off, keyguard or explicit lock happened in between, both before and after SQLCipher opens. The success callback re-checks the epoch and `isUnlocked` inside the main-thread callback (`UnlockOutcomeGate`), so a lock that lands after the open but before the callback runs (e.g. a 0 ms auto-lock during maintenance) reports "interrupted" instead of flipping the UI back to unlocked.
 
 ## Known behaviour
 

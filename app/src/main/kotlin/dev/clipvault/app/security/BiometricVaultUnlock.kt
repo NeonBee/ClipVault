@@ -37,6 +37,8 @@ class BiometricVaultUnlock(
         fun onFailure(message: String)
     }
 
+    private val outcomeGate = UnlockOutcomeGate(app::lockEpoch, app::isUnlocked)
+
     fun start(allowEnrollment: Boolean) {
         val availability = BiometricManager.from(activity)
             .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
@@ -87,7 +89,9 @@ class BiometricVaultUnlock(
                 databaseKey = if (enrollment) keyManager.finishEnrollment(cipher) else keyManager.finishUnlock(cipher)
                 val imported = app.openVault(databaseKey, epoch)
                 databaseKey = null
-                activity.runOnUiThread { listener.onOpened(imported) }
+                activity.runOnUiThread {
+                    outcomeGate.deliver(epoch, imported, listener) { activity.getString(R.string.unlock_interrupted) }
+                }
             } catch (_: ClipVaultApp.UnlockInterruptedException) {
                 databaseKey?.fill(0)
                 activity.runOnUiThread { listener.onFailure(activity.getString(R.string.unlock_interrupted)) }
