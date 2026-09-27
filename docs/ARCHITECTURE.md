@@ -4,7 +4,7 @@ ClipVault uses one Android application module with explicit boundaries instead o
 
 ## Layers
 
-- **Compose presentation:** a single `MainActivity`, Navigation Compose destinations, `VaultViewModel`, StateFlow and Paging 3.
+- **Compose presentation:** `MainActivity` with Navigation Compose destinations, `VaultViewModel`, StateFlow and Paging 3, plus `QuickPasteActivity`: an unexported, recents-excluded search-and-copy window started from ClipVault's dynamic launcher shortcut. Both windows unlock through `BiometricVaultUnlock` and copy back through `SensitiveClipboard`.
 - **Application container:** owns UI settings and the encrypted backup manager. Database ownership remains in `ClipVaultApp` so lock transitions can close SQLCipher deterministically.
 - **Encrypted persistence:** `VaultRepository` is the synchronized SQLCipher boundary. Schema v3 contains clips, collections, tags, links, capture rules and an FTS5 index with the persistent FTS5 `secure-delete` option. The v2 → v3 migration enables it, rebuilds the index and truncates the WAL so terms of clips deleted under v2 are purged.
 - **Locked-state ingress:** `SecurePendingStore` uses a separate non-exportable Keystore AES key and HMAC lookup key. It can accept clipboard text while the biometric database key is absent.
@@ -28,7 +28,9 @@ ClipVault uses one Android application module with explicit boundaries instead o
 
 ## Lock lifecycle
 
-The database key exists only while the vault is unlocked. `lockVault()` immediately makes the repository unavailable and closes SQLCipher on the serialized I/O executor. Background capture continues into encrypted staging. Maintenance requested while locked is applied after the next biometric unlock.
+The database key exists only while the vault is unlocked. `lockVault()` immediately makes the repository unavailable and closes SQLCipher on the serialized I/O executor, then notifies every open window on the main thread so it drops decrypted state. Background capture continues into encrypted staging. Maintenance requested while locked is applied after the next biometric unlock.
+
+Auto-lock is process-wide (`VaultAutoLock`, driven by activity start/stop callbacks in `ClipVaultApp`): the timer is armed only when the last started ClipVault activity stops for a reason other than a configuration change, and cancelled when any activity starts. Screen-off locks immediately. QuickPaste additionally closes itself when hidden and clears its in-memory query and results on close or lock.
 
 ## Offline boundary
 

@@ -48,6 +48,27 @@
             </intent-filter>
         </activity>
 
+        <!-- Unexported: reached only through ClipVault's own launcher shortcut. Separate task, no recents
+             entry, and config changes handled in place so a DeX resize does not cancel the biometric prompt. -->
+        <activity
+            android:name=".quickpaste.QuickPasteActivity"
+            android:autoRemoveFromRecents="true"
+            android:configChanges="density|keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:label="@string/quick_paste_title"
+            android:launchMode="singleTask"
+            android:taskAffinity="${applicationId}.quickpaste"
+            android:windowSoftInputMode="stateVisible|adjustResize">
+            <!-- Initial freeform (DeX) window size; phones ignore it and show the window full screen. -->
+            <layout
+                android:defaultHeight="620dp"
+                android:defaultWidth="560dp"
+                android:gravity="center"
+                android:minHeight="400dp"
+                android:minWidth="360dp" />
+        </activity>
+
         <service
             android:name=".clipboard.ClipboardCaptureService"
             android:exported="false"

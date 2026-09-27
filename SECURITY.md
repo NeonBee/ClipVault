@@ -22,10 +22,11 @@ There is intentionally no recovery key, server escrow or bypass. Losing or inval
 ## Runtime protections
 
 - `FLAG_SECURE` blocks screenshots and recent-app previews.
+- QuickPaste has no plaintext cache: it shows vault content only while the vault is unlocked through the same `BiometricPrompt` + `CryptoObject` path, cannot enroll a new key, is not exported, is excluded from recents with its thumbnail disabled, never persists the search query and closes when hidden. It restores a clip to the clipboard only; it does not inject input or auto-paste.
 - Foreground notifications contain status only, never clipboard content.
 - Copied-back clips use `EXTRA_IS_SENSITIVE` where supported.
 - Vault lock drops repository access immediately and closes SQLCipher on the serialized I/O executor.
-- Screen-off/background timeout and explicit notification lock are supported.
+- Screen-off/background timeout and explicit notification lock are supported. The background timeout starts only when no ClipVault window is visible, covers vaults unlocked from QuickPaste, and is armed when an unlock completes after the window was already hidden. A lock during an unlock invalidates it (lock epoch), so a late database open cannot reopen the vault.
 - Likely OTP, password/token phrases and payment numbers are skipped by default.
 
 ## Shizuku boundary

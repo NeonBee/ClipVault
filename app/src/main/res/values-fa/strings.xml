@@ -55,4 +55,17 @@
     <string name="type_reset">برای تأیید RESET را وارد کنید</string>
     <string name="vault_reset_complete">خزانه بازنشانی شد؛ برای ساخت خزانه رمزنگاری‌شده جدید، آن را باز کنید.</string>
     <string name="reset_failed">بازنشانی امن خزانه انجام نشد.</string>
+    <string name="quick_paste_title">چسباندن سریع</string>
+    <string name="quick_paste_shortcut_long">جست‌وجو و کپی یک کلیپ</string>
+    <string name="quick_paste_search_hint">جست‌وجوی کلیپ‌ها</string>
+    <string name="quick_paste_locked">خزانه قفل است</string>
+    <string name="quick_paste_unlocking">در حال باز کردن خزانه…</string>
+    <string name="quick_paste_setup_required">پیش از استفاده از چسباندن سریع، ClipVault را در برنامه راه‌اندازی کنید.</string>
+    <string name="quick_paste_key_invalidated">ثبت بیومتریک تغییر کرده است. برای بازنشانی خزانه، ClipVault را باز کنید.</string>
+    <string name="quick_paste_open_app">باز کردن ClipVault</string>
+    <string name="quick_paste_close">بستن</string>
+    <string name="quick_paste_empty">هنوز کلیپی نیست</string>
+    <string name="quick_paste_no_match">کلیپی پیدا نشد</string>
+    <string name="quick_paste_keys_hint">↑↓ انتخاب · Enter کپی · Esc بستن</string>
+    <string name="unlock_interrupted">خزانه هنگام باز شدن قفل شد. دوباره احراز هویت کنید.</string>
 </resources>

@@ -174,4 +174,17 @@
     <string name="type_reset">Type RESET to confirm</string>
     <string name="vault_reset_complete">Vault reset complete. Unlock to create a new encrypted vault.</string>
     <string name="reset_failed">The vault could not be reset safely.</string>
+    <string name="quick_paste_title">Quick paste</string>
+    <string name="quick_paste_shortcut_long">Search and copy a clip</string>
+    <string name="quick_paste_search_hint">Search clips</string>
+    <string name="quick_paste_locked">Vault is locked</string>
+    <string name="quick_paste_unlocking">Opening vault…</string>
+    <string name="quick_paste_setup_required">Set up ClipVault in the app before using quick paste.</string>
+    <string name="quick_paste_key_invalidated">Biometric enrollment changed. Open ClipVault to reset the vault.</string>
+    <string name="quick_paste_open_app">Open ClipVault</string>
+    <string name="quick_paste_close">Close</string>
+    <string name="quick_paste_empty">No clips yet</string>
+    <string name="quick_paste_no_match">No matching clips</string>
+    <string name="quick_paste_keys_hint">↑↓ select · Enter copy · Esc close</string>
+    <string name="unlock_interrupted">The vault was locked while unlocking. Authenticate again.</string>
 </resources>
