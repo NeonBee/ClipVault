@@ -31,6 +31,8 @@ Unlock race (review of PR #11): the database opens on the IO executor after the 
 
 - A restored clip is captured again by the running capture service, like a copy from the main window: the existing row's count and `last_captured_at` update, so it moves to the top of recents. Self-copy suppression is a separate test item in design §22.
 - The soft keyboard may learn typed queries; ClipVault does not persist them. Compose offers no `IME_FLAG_NO_PERSONALIZED_LEARNING` switch without dropping to a View-based field.
+- DeX follow-up for WP-06: the current freeform minimum (360×400dp, default 560×620dp) is functionally correct but larger than desired on the target device.
+- DeX follow-up for WP-06: after unlocking from QuickPaste and leaving QuickPaste open, opening MainActivity within roughly five seconds reuses the process-wide unlocked vault, but waiting roughly five seconds or more can cause MainActivity to request biometric authentication again even though the configured background auto-lock is 30 seconds. This was reproduced with the handset display both on and off; `screen_off_timeout` was 180000 ms, so the observation is not explained by the normal display timeout. The root lifecycle/session transition is not yet isolated. This is fail-closed (extra authentication, not unintended access), so it is tracked as a DeX UX/session-continuity issue for WP-06 rather than a WP-05 security blocker.
 
 ## Device check (Samsung DeX)
 
@@ -46,6 +48,8 @@ Validated on the WP-04 device (SM-S918N) with the PR #11 debug build installed i
 | Screenshot / recents | Screenshot blocked; no Quick paste card in recents | PASS |
 | Window size in DeX | Opens as a compact freeform window, resizable without losing the query | PASS — resize/query retention works; current minimum window size is larger than desired. Reduce/tune the DeX minimum size in WP-06. |
 | Minimise QuickPaste, wait > auto-lock timeout, open main app | Vault locked | PASS — auto-lock starts once all ClipVault activities are background/stopped. DeX freeform lifecycle can make the exact start moment appear variable while a window remains foreground/started. |
-| Unlock from QuickPaste, then open main app | Main app shows the vault, no second prompt | PASS — confirmed within the configured 30 s auto-lock window. Reverse direction (MainActivity → QuickPaste) also shares the same unlocked vault without another biometric prompt. |
+| Unlock from QuickPaste, then open main app | Main app shows the vault, no second prompt | PASS with WP-06 follow-up — immediate/short-delay transitions reuse the unlocked vault, but the target device reproducibly asks for biometric again after roughly five seconds while QuickPaste remains open. This is shorter than the configured 30 s background auto-lock and needs DeX session/lifecycle tuning in WP-06. |
 
-Additional observation: an earlier QuickPaste → MainActivity retest appeared to require biometric authentication only because the configured auto-lock timeout had elapsed before the second activity was opened. Repeating both directions within the 30 s window passed, so this is not treated as a WP-05 blocker.
+Additional validation:
+- When both ClipVault activities are fully backgrounded, the configured 30 s auto-lock behaves as expected: access at about 10 s remains unlocked, while access after the timeout requires biometric authentication.
+- The approximately five-second QuickPaste → MainActivity re-authentication behavior is independent of handset display on/off in the observed test. The device's `screen_off_timeout` is 180000 ms. Cause remains open for WP-06 investigation; current behavior is conservative/fail-closed.
