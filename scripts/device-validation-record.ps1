@@ -86,7 +86,7 @@ function Get-Pref([string]$Xml, [string]$Name) {
 
 function Get-LockLog([string]$Xml) {
     # lock_log 값은 여러 줄이다. SharedPreferences XML 은 줄바꿈을 그대로 두거나 &#10; 로 escape 하므로
-    # (?s) 로 여러 줄을 잡고 HtmlDecode 로 entity 를 푼다. 각 줄: 사유;시각ms;unlock후ms;창;화면;keyguard;deviceLocked;DeX
+    # (?s) 로 여러 줄을 잡고 HtmlDecode 로 entity 를 푼다. 각 줄: 사유;시각ms;unlock후ms;창;interactive;keyguard;deviceLocked;DeX
     $match = [regex]::Match($Xml, '(?s)<string name="lock_log">(.*?)</string>')
     if (-not $match.Success) { return @() }
     $decoded = [System.Net.WebUtility]::HtmlDecode($match.Groups[1].Value)
@@ -210,7 +210,8 @@ $lines.Add('')
 if ($lockEvents.Count -eq 0) {
     $lines.Add('기록 없음(debug 빌드가 아니거나, 이 버전 설치 뒤 열린 vault 가 잠긴 적 없음).')
 } else {
-    $lines.Add('| 시각 | 사유 | unlock 후 | 시작된 창 | 화면 | keyguard | device locked | DeX |')
+    # interactive = PowerManager.isInteractive()(기기 전원 상태). 특정 디스플레이의 켜짐/꺼짐이 아니다(DeX 는 외부 화면을 쓴다).
+    $lines.Add('| 시각 | 사유 | unlock 후 | 시작된 창 | interactive | keyguard | device locked | DeX |')
     $lines.Add('| --- | --- | --- | --- | --- | --- | --- | --- |')
     foreach ($event in $lockEvents) {
         $at = [DateTimeOffset]::FromUnixTimeMilliseconds([long]$event[1]).ToLocalTime().ToString('MM-dd HH:mm:ss')
@@ -219,7 +220,7 @@ if ($lockEvents.Count -eq 0) {
         $windows = '?'
         if ([int]$event[3] -ge 0) { $windows = $event[3] }
         $lines.Add(('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} |' -f $at, $event[0], $since, $windows,
-            (Format-Flag $event[4] 'on' 'off'), (Format-Flag $event[5] 'locked' '-'),
+            (Format-Flag $event[4] 'yes' 'no'), (Format-Flag $event[5] 'locked' '-'),
             (Format-Flag $event[6] 'locked' '-'), (Format-Flag $event[7] 'DeX' '-')))
     }
 }

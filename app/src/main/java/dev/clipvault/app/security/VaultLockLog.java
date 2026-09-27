@@ -63,7 +63,11 @@ public final class VaultLockLog {
             this.desktopMode = desktopMode;
         }
 
-        /** One-line diagnostic value, e.g. "DEVICE_LOCKED_MAIN · +5.2s · windows 1 · screen on · keyguard · device locked · DeX". */
+        /**
+         * One-line diagnostic value, e.g. "DEVICE_LOCKED_MAIN · +5.2s · windows 1 · interactive · keyguard · device locked · DeX".
+         * "interactive" is PowerManager.isInteractive(), the device power state; it is not the on/off
+         * state of a particular display (DeX drives an external display while the handset may be off).
+         */
         @NonNull
         public String summary() {
             StringBuilder out = new StringBuilder(reason.name());
@@ -71,7 +75,7 @@ public final class VaultLockLog {
                 out.append(" · +").append(String.format(Locale.ROOT, "%.1fs", sinceUnlockMs / 1000.0));
             }
             if (startedWindows >= 0) out.append(" · windows ").append(startedWindows);
-            flag(out, interactive, "screen on", "screen off");
+            flag(out, interactive, "interactive", "non-interactive");
             flag(out, keyguardLocked, "keyguard", null);
             flag(out, deviceLocked, "device locked", null);
             flag(out, desktopMode, "DeX", null);

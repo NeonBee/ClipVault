@@ -2,7 +2,10 @@ package dev.clipvault.app.security
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import dev.clipvault.app.ClipVaultApp
+import dev.clipvault.app.ui.VaultViewModel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -40,8 +43,7 @@ class VaultLockReasonInstrumentedTest {
     }
 
     @Test fun lockFromOpenRecordsReasonAndClearsTheOpenMarker() {
-        app.io().submit<Int> { app.openVault(ByteArray(32) { (it + 91).toByte() }) }.get(10, TimeUnit.SECONDS)
-        assertTrue(app.isUnlocked)
+        openTestVault()
         assertTrue("open marker set while unlocked", app.settings().contains(ClipVaultApp.PREF_VAULT_OPEN_MARKER))
 
         app.lockVault(VaultLockLog.Reason.USER)
@@ -60,6 +62,41 @@ class VaultLockReasonInstrumentedTest {
         app.lockVault(VaultLockLog.Reason.DEVICE_LOCKED_MAIN)
         drainIo()
         assertEquals(0, VaultLockLog.parse(app.settings().getString(ClipVaultApp.PREF_LOCK_LOG, "")).size)
+    }
+
+    @Test fun lockReasonSurvivesTheLockResetAndReopenInDiagnostics() {
+        // Review PR #12: lockVault(reason) writes the log, then the lock listener resets VaultUiState
+        // (onVaultLocked), then the user re-authenticates (onVaultOpened) and opens Diagnostics.
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val store = ViewModelStore()
+        lateinit var viewModel: VaultViewModel
+        instrumentation.runOnMainSync {
+            viewModel = ViewModelProvider(store, ViewModelProvider.AndroidViewModelFactory.getInstance(app))[VaultViewModel::class.java]
+        }
+        val lockListener = Runnable { viewModel.onVaultLocked() }   // as MainActivity registers it
+        app.addLockListener(lockListener)
+        try {
+            openTestVault()
+            instrumentation.runOnMainSync { viewModel.onVaultOpened(0) }
+
+            instrumentation.runOnMainSync { app.lockVault(VaultLockLog.Reason.DEVICE_LOCKED_MAIN) }
+            drainIo()
+            assertFalse(viewModel.state.value.unlocked)
+            assertEquals(VaultLockLog.Reason.DEVICE_LOCKED_MAIN, viewModel.state.value.lockEvents.firstOrNull()?.reason)
+
+            openTestVault()
+            instrumentation.runOnMainSync { viewModel.onVaultOpened(0) }
+            assertTrue(viewModel.state.value.unlocked)
+            assertEquals(VaultLockLog.Reason.DEVICE_LOCKED_MAIN, viewModel.state.value.lockEvents.firstOrNull()?.reason)
+        } finally {
+            app.removeLockListener(lockListener)
+            instrumentation.runOnMainSync { store.clear() }
+        }
+    }
+
+    private fun openTestVault() {
+        app.io().submit<Int> { app.openVault(ByteArray(32) { (it + 91).toByte() }) }.get(10, TimeUnit.SECONDS)
+        assertTrue(app.isUnlocked)
     }
 
     private fun drainIo() {

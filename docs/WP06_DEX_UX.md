@@ -22,7 +22,7 @@ Item 2 is fail-closed, so the fix must not guess. Every path that can drop the u
 | `PROCESS_RESTART` | The previous process ended while the vault was open (kill, crash, reboot). No `lockVault()` runs in that case, so an open marker written at unlock is detected at the next process start. |
 | `OTHER` | Any other caller (tests). |
 
-Each event stores only: reason, time, time since unlock in this process, number of started ClipVault activities, screen interactive, `isKeyguardLocked`, `isDeviceLocked`, and Samsung DeX desktop mode (`Configuration.semDesktopModeEnabled`, reflection, diagnostics only). No clipboard content, key material or search text. The last 8 events are kept in app preferences (`lock_log`), newest first. Only transitions from unlocked to locked are recorded, so repeated keyguard checks while already locked do not flood the log.
+Each event stores only: reason, time, time since unlock in this process, number of started ClipVault activities, `PowerManager.isInteractive()` (device power state, not the on/off state of a particular display — DeX drives an external display while the handset panel may be off), `isKeyguardLocked`, `isDeviceLocked`, and Samsung DeX desktop mode (`Configuration.semDesktopModeEnabled`, reflection, diagnostics only). No clipboard content, key material or search text. The last 8 events are kept in app preferences (`lock_log`), newest first. Only transitions from unlocked to locked are recorded, so repeated keyguard checks while already locked do not flood the log.
 
 Where to read it:
 
@@ -37,13 +37,14 @@ Install the build in place (`adb install -r`, never uninstall). Then:
 2. Leave Quick paste open; wait about 10 s (longer than the ~5 s threshold, shorter than the 30 s auto-lock).
 3. Open ClipVault (main window). If it asks for biometrics, authenticate.
 4. Run `powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1` and paste the "Lock log" table, or copy the newest "Lock" row from Diagnostics.
+5. Also note whether the row shows `DeX` (Samsung desktop-mode reflection); if it shows no DeX flag while in DeX, the reflection is not available on this build.
 
 How to read the top row:
 
 | Top row | Meaning / next step |
 | --- | --- |
 | `DEVICE_LOCKED_MAIN`, device locked | The keyguard considers the device locked while DeX runs (e.g. Samsung "lock after screen timeout" on the handset). Policy decision needed: keep fail-closed, or scope the check to the display the activity is on. DeX must stay a non-authentication factor (§20.10). |
-| `SCREEN_OFF` | The handset display turning off in DeX sends screen-off. Consider whether handset screen-off in DeX should lock (it should unless the design is changed). |
+| `SCREEN_OFF` | The device became non-interactive (`ACTION_SCREEN_OFF`); in DeX check whether the handset panel timeout triggers it. Consider whether handset screen-off in DeX should lock (it should unless the design is changed). |
 | `AUTO_LOCK_TIMEOUT`, windows 0 | A ClipVault window stopped although it looked open (DeX freeform lifecycle). Fix activity counting / QuickPaste close-on-stop behaviour. |
 | `PROCESS_RESTART` | The process died; look for low-memory kills or crashes (`adb logcat -b crash`). |
 | no new row | The vault was not locked; the prompt came from something else (e.g. MainActivity state). Report it. |

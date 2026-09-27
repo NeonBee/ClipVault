@@ -157,6 +157,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                 message = if (imported > 0) "$imported staged clips imported" else null,
                 query = it.query.copy(generation = it.query.generation + 1))
         }
+        publishBridgeDiagnostics()
         refreshMetadata()
     }
 
@@ -167,6 +168,9 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onVaultLocked() {
         mutableState.value = VaultUiState(unlocked = false, pendingCount = app.pending().count())
+        // The reset drops decrypted state only. Sanitized diagnostics (bridge state, capture error, lock
+        // reasons) are reloaded: lockVault() records its reason just before this listener runs.
+        publishBridgeDiagnostics()
     }
 
     fun setBusy(value: Boolean) = mutableState.update { it.copy(busy = value, error = null) }

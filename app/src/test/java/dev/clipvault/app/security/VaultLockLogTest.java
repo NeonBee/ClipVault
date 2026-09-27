@@ -53,11 +53,11 @@ public class VaultLockLogTest {
 
     @Test
     public void summaryNamesReasonTimingAndDeviceState() {
-        assertEquals("DEVICE_LOCKED_MAIN · +5.2s · windows 1 · screen on · keyguard · device locked · DeX",
+        assertEquals("DEVICE_LOCKED_MAIN · +5.2s · windows 1 · interactive · keyguard · device locked · DeX",
                 event(VaultLockLog.Reason.DEVICE_LOCKED_MAIN, 0).summary());
         String unknown = new VaultLockLog.Event(VaultLockLog.Reason.PROCESS_RESTART, 0, VaultLockLog.UNKNOWN,
                 VaultLockLog.UNKNOWN, 0, 0, 0, VaultLockLog.UNKNOWN).summary();
-        assertEquals("PROCESS_RESTART · screen off", unknown);
+        assertEquals("PROCESS_RESTART · non-interactive", unknown);
     }
 
     @Test
