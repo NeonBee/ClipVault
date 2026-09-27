@@ -1,50 +1,107 @@
 # WP-06 DeX UX
 
-Terminology: `PR #N` is a GitHub Pull Request number; `WP-NN` is a design Work Package (see `DEX_FORK_AUDIT_DESIGN.md` §21).
+용어:
+- `PR #N`은 GitHub Pull Request 번호를 의미한다.
+- `WP-NN`은 설계 Work Package 번호를 의미한다(`DEX_FORK_AUDIT_DESIGN.md` §21 참조).
 
-Scope (design §21 WP-06): freeform window sizing, focus, taskbar / notification / Quick Settings invocation, DeX density. Carried over from WP-05 device validation (`WP05_QUICK_PASTE.md`, Known behaviour):
+## 범위
 
-1. QuickPaste freeform minimum/default size (360×400dp / 560×620dp) is larger than wanted.
-2. After unlocking from QuickPaste and leaving it open, switching to MainActivity after roughly five seconds asks for biometrics again, although the configured auto-lock is 30 s.
+설계 §21의 WP-06 범위는 다음과 같다.
 
-## Step 1 — lock reason diagnostics (this PR)
+- 자유 창(freeform) 크기
+- 포커스 처리
+- 작업표시줄 / 알림 / Quick Settings 진입점
+- DeX 밀도(density)
 
-Item 2 is fail-closed, so the fix must not guess. Every path that can drop the unlocked vault now records a reason:
+WP-05 실기기 검증(`WP05_QUICK_PASTE.md`의 Known behaviour)에서 다음 두 항목이 이관되었다.
 
-| Reason | Trigger |
+1. QuickPaste 자유 창의 최소/기본 크기(360×400dp / 560×620dp)가 목표 UX보다 크다.
+2. QuickPaste에서 잠금을 해제한 뒤 창을 열어둔 상태로 약 5초 이상 기다렸다가 MainActivity로 전환하면, 설정된 background auto-lock은 30초임에도 다시 생체 인증을 요구한다.
+
+## 1단계 — 잠금 사유 진단
+
+2번 현상은 fail-closed 방향의 문제이므로 원인을 추측해서 정책을 바꾸지 않는다. 먼저 열려 있던 vault가 잠기는 모든 경로에 사유 코드를 기록한다.
+
+| 사유 코드 | 발생 조건 |
 | --- | --- |
-| `AUTO_LOCK_TIMEOUT` | Process-wide timer; armed only when no ClipVault activity is started. |
-| `SCREEN_OFF` | `ACTION_SCREEN_OFF`. |
-| `DEVICE_LOCKED_MAIN` | `MainActivity.onResume` saw `KeyguardManager.isDeviceLocked()`. |
-| `DEVICE_LOCKED_QUICK_PASTE` | `QuickPasteActivity.onStart` saw `isDeviceLocked()`. |
-| `NOTIFICATION` | "Lock now" notification action. |
-| `USER` | Lock button in the app. |
-| `PROCESS_RESTART` | The previous process ended while the vault was open (kill, crash, reboot). No `lockVault()` runs in that case, so an open marker written at unlock is detected at the next process start. |
-| `OTHER` | Any other caller (tests). |
+| `AUTO_LOCK_TIMEOUT` | 프로세스 공통 auto-lock 타이머가 만료됨. 시작된 ClipVault Activity가 하나도 없을 때만 타이머가 동작한다. |
+| `SCREEN_OFF` | `ACTION_SCREEN_OFF` 수신. |
+| `DEVICE_LOCKED_MAIN` | `MainActivity.onResume`에서 `KeyguardManager.isDeviceLocked()`가 true로 확인됨. |
+| `DEVICE_LOCKED_QUICK_PASTE` | `QuickPasteActivity.onStart`에서 `isDeviceLocked()`가 true로 확인됨. |
+| `NOTIFICATION` | 알림의 "Lock now" 동작으로 잠금. |
+| `USER` | 앱 내부 잠금 버튼으로 잠금. |
+| `PROCESS_RESTART` | vault가 열린 상태에서 이전 프로세스가 종료됨(kill, crash, reboot). 이 경우 `lockVault()`가 실행되지 않으므로 unlock 시 기록한 open marker가 다음 프로세스 시작 때 남아 있는지를 검사해 기록한다. |
+| `OTHER` | 그 외 호출 경로(주로 테스트). |
 
-Each event stores only: reason, time, time since unlock in this process, number of started ClipVault activities, `PowerManager.isInteractive()` (device power state, not the on/off state of a particular display — DeX drives an external display while the handset panel may be off), `isKeyguardLocked`, `isDeviceLocked`, and Samsung DeX desktop mode (`Configuration.semDesktopModeEnabled`, reflection, diagnostics only). No clipboard content, key material or search text. The last 8 events are kept in app preferences (`lock_log`), newest first. Only transitions from unlocked to locked are recorded, so repeated keyguard checks while already locked do not flood the log.
+각 이벤트에는 다음 정보만 저장한다.
 
-Where to read it:
+- 잠금 사유
+- 발생 시각
+- 현재 프로세스에서 unlock된 뒤 경과 시간
+- 시작된 ClipVault Activity 수
+- `PowerManager.isInteractive()`
+- `isKeyguardLocked`
+- `isDeviceLocked`
+- Samsung DeX desktop mode 여부(`Configuration.semDesktopModeEnabled` reflection, 진단 전용)
 
-- Settings > Diagnostics > "Lock MM-dd HH:mm:ss" rows (unlock first to reach Settings; the log survives locking).
-- `scripts/device-validation-record.ps1` prints a "Lock log" table (debug build, `run-as`, read only).
+`PowerManager.isInteractive()`는 **기기 전원/상호작용 상태**이며 특정 디스플레이의 물리적 on/off 상태를 의미하지 않는다. DeX에서는 외부 디스플레이가 동작하는 동안 휴대폰 패널이 꺼져 있을 수 있으므로 해석에 주의한다.
 
-### Reproduction on the WP-04 device (SM-S918N, DeX)
+클립보드 내용, 검색어, key material은 저장하지 않는다. 최근 8건만 app preferences의 `lock_log`에 최신순으로 유지한다. 이미 잠긴 상태에서 반복해서 들어오는 keyguard/lock 호출은 새 이벤트로 기록하지 않는다.
 
-Install the build in place (`adb install -r`, never uninstall). Then:
+### 확인 위치
 
-1. In DeX, open Quick paste from the taskbar shortcut and unlock.
-2. Leave Quick paste open; wait about 10 s (longer than the ~5 s threshold, shorter than the 30 s auto-lock).
-3. Open ClipVault (main window). If it asks for biometrics, authenticate.
-4. Run `powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1` and paste the "Lock log" table, or copy the newest "Lock" row from Diagnostics.
-5. Also note whether the row shows `DeX` (Samsung desktop-mode reflection); if it shows no DeX flag while in DeX, the reflection is not available on this build.
+- 설정 > 진단 > `Lock MM-dd HH:mm:ss` 행
+  - 설정 화면에 들어가려면 먼저 vault를 unlock해야 한다.
+  - lock log 자체는 vault가 잠겨도 유지된다.
+- `scripts/device-validation-record.ps1`
+  - debug build에서 `run-as`를 이용해 읽기 전용으로 `Lock log` 표를 출력한다.
 
-How to read the top row:
+## WP-04 실기기 재현 절차 — SM-S918N / Samsung DeX
 
-| Top row | Meaning / next step |
+기존 데이터를 보존하기 위해 빌드는 반드시 제자리 설치한다.
+
+```powershell
+adb install -r <apk>
+```
+
+**uninstall 또는 app data clear는 하지 않는다.**
+
+그 다음 아래 순서로 재현한다.
+
+1. DeX에서 작업표시줄의 Quick paste 바로가기로 QuickPaste를 열고 생체 인증으로 unlock한다.
+2. QuickPaste 창을 그대로 열어둔 채 약 10초 기다린다.
+   - 관찰된 약 5초 경계보다는 길고,
+   - 설정된 30초 background auto-lock보다는 짧은 시간이다.
+3. ClipVault MainActivity를 연다.
+4. 다시 생체 인증을 요구하면 인증을 완료한다.
+5. 아래 스크립트를 실행한다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1
+```
+
+6. 출력된 `Lock log` 표의 가장 위 행을 확인한다. 또는 설정 > 진단에서 가장 최근 `Lock` 행을 확인한다.
+7. 해당 행에 `DeX` 플래그가 표시되는지도 확인한다.
+   - DeX 사용 중인데 표시되지 않는다면 현재 One UI build에서 해당 reflection을 사용할 수 없는 것으로 본다.
+
+## 최신 Lock log 해석
+
+| 가장 최근 기록 | 의미 / 다음 조치 |
 | --- | --- |
-| `DEVICE_LOCKED_MAIN`, device locked | The keyguard considers the device locked while DeX runs (e.g. Samsung "lock after screen timeout" on the handset). Policy decision needed: keep fail-closed, or scope the check to the display the activity is on. DeX must stay a non-authentication factor (§20.10). |
-| `SCREEN_OFF` | The device became non-interactive (`ACTION_SCREEN_OFF`); in DeX check whether the handset panel timeout triggers it. Consider whether handset screen-off in DeX should lock (it should unless the design is changed). |
-| `AUTO_LOCK_TIMEOUT`, windows 0 | A ClipVault window stopped although it looked open (DeX freeform lifecycle). Fix activity counting / QuickPaste close-on-stop behaviour. |
-| `PROCESS_RESTART` | The process died; look for low-memory kills or crashes (`adb logcat -b crash`). |
-| no new row | The vault was not locked; the prompt came from something else (e.g. MainActivity state). Report it. |
+| `DEVICE_LOCKED_MAIN` + `device locked` | DeX 사용 중인데도 keyguard가 기기를 locked로 판정한 경우다. 현재 fail-closed 정책을 유지할지, Activity가 올라간 display를 고려하도록 범위를 좁힐지 결정해야 한다. 단, DeX mode 자체를 인증 요소로 사용해서는 안 된다(§20.10). |
+| `DEVICE_LOCKED_QUICK_PASTE` + `device locked` | QuickPaste 시작 시점에 keyguard가 기기를 locked로 판정했다. MainActivity 경로와 동일하게 DeX/keyguard 의미론을 확인한다. |
+| `SCREEN_OFF` | `ACTION_SCREEN_OFF`로 vault가 잠겼다. DeX에서 휴대폰 패널 상태 변화가 이 broadcast를 발생시키는지 확인한다. 화면 꺼짐 잠금 정책을 변경하려면 별도 보안 결정을 거쳐야 한다. |
+| `AUTO_LOCK_TIMEOUT` + `windows 0` | 화면상 창이 남아 있는 것처럼 보였지만 Android lifecycle상 모든 ClipVault Activity가 stopped 상태가 되어 auto-lock 타이머가 동작한 경우다. Activity counting 또는 QuickPaste의 stop/close 동작을 조정한다. |
+| `PROCESS_RESTART` | vault가 열린 상태에서 앱 프로세스가 종료됐다. low-memory kill 또는 crash 여부를 `adb logcat -b crash` 등으로 확인한다. |
+| 새 기록 없음 | vault 자체는 잠기지 않았는데 biometric prompt가 다시 나타난 경우다. MainActivity/QuickPaste의 UI state 또는 BiometricPrompt 시작 조건을 별도로 추적한다. |
+
+## 이 단계의 완료 조건
+
+1단계의 목적은 정책 수정이 아니라 **약 5초 재인증 현상의 실제 잠금 경로를 확정하는 것**이다.
+
+실기기 재현 결과에서 최신 lock reason을 확보한 뒤 다음 WP-06 작업으로 넘어간다.
+
+- QuickPaste 최소/기본 창 크기 및 DeX density 조정
+- 포커스 동작 조정
+- 알림 / Quick Settings / 작업표시줄 진입점
+- 확인된 원인에 따른 session continuity / lock 정책 조정
