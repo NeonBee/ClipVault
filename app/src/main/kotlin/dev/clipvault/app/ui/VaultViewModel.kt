@@ -16,6 +16,7 @@ import dev.clipvault.app.data.CollectionRecord
 import dev.clipvault.app.data.RetentionPolicy
 import dev.clipvault.app.data.TagRecord
 import dev.clipvault.app.data.VaultStats
+import dev.clipvault.app.security.VaultLockLog
 import dev.clipvault.app.ui.settings.AccentPalette
 import dev.clipvault.app.ui.settings.AppLanguage
 import dev.clipvault.app.ui.settings.ThemeMode
@@ -82,6 +83,8 @@ data class VaultUiState(
     val lastCaptureAt: Long = 0,
     val lastCaptureError: String = "",
     val bridgeState: String = "",
+    /** Sanitized recent lock reasons, newest first (WP-06 session-continuity diagnosis). */
+    val lockEvents: List<VaultLockLog.Event> = emptyList(),
     val autoLockMs: Long = 30_000,
 )
 
@@ -123,7 +126,8 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
      * once. Held in a field: SharedPreferences keeps listeners weakly.
      */
     private val bridgePreferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == null || key == ClipVaultApp.PREF_BRIDGE_STATE || key == ClipVaultApp.PREF_LAST_CAPTURE_ERROR) {
+        if (key == null || key == ClipVaultApp.PREF_BRIDGE_STATE || key == ClipVaultApp.PREF_LAST_CAPTURE_ERROR ||
+            key == ClipVaultApp.PREF_LOCK_LOG) {
             publishBridgeDiagnostics()
         }
     }
@@ -143,7 +147,8 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         val settings = app.settings()
         val bridgeState = settings.getString(ClipVaultApp.PREF_BRIDGE_STATE, "").orEmpty()
         val captureError = settings.getString(ClipVaultApp.PREF_LAST_CAPTURE_ERROR, "").orEmpty()
-        mutableState.update { it.copy(bridgeState = bridgeState, lastCaptureError = captureError) }
+        val lockEvents = VaultLockLog.parse(settings.getString(ClipVaultApp.PREF_LOCK_LOG, ""))
+        mutableState.update { it.copy(bridgeState = bridgeState, lastCaptureError = captureError, lockEvents = lockEvents) }
     }
 
     fun onVaultOpened(imported: Int) {
@@ -152,6 +157,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                 message = if (imported > 0) "$imported staged clips imported" else null,
                 query = it.query.copy(generation = it.query.generation + 1))
         }
+        publishBridgeDiagnostics()
         refreshMetadata()
     }
 
@@ -162,6 +168,9 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onVaultLocked() {
         mutableState.value = VaultUiState(unlocked = false, pendingCount = app.pending().count())
+        // The reset drops decrypted state only. Sanitized diagnostics (bridge state, capture error, lock
+        // reasons) are reloaded: lockVault() records its reason just before this listener runs.
+        publishBridgeDiagnostics()
     }
 
     fun setBusy(value: Boolean) = mutableState.update { it.copy(busy = value, error = null) }

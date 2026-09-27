@@ -720,6 +720,11 @@ private fun SettingsScreen(
                 state.bridgeState.ifBlank { stringResource(R.string.none) })
             DiagnosticRow(stringResource(R.string.android_build),
                 "${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT}) · ${android.os.Build.DISPLAY}")
+            // Why the vault last locked (reason code + device state, never content); newest first.
+            if (state.lockEvents.isEmpty()) DiagnosticRow(stringResource(R.string.recent_locks), stringResource(R.string.none))
+            state.lockEvents.forEach { event ->
+                DiagnosticRow(stringResource(R.string.lock_at, formatLockTime(event.atMillis)), event.summary())
+            }
             DiagnosticRow(stringResource(R.string.database), stringResource(R.string.encrypted_unlocked))
             DiagnosticRow(stringResource(R.string.network_permission), stringResource(R.string.not_present))
         }
@@ -787,6 +792,10 @@ private fun RuleRow(rule: CaptureRule, onEnabled: (Boolean) -> Unit, onDelete: (
         Switch(rule.enabled, onEnabled); IconButton(onDelete) { Icon(Icons.Default.Delete, null) }
     }
 }
+
+/** Seconds matter when matching a lock to a reproduction step. */
+internal fun formatLockTime(atMillis: Long): String =
+    java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.ROOT).format(java.util.Date(atMillis))
 
 @Composable
 internal fun DiagnosticRow(label: String, value: String) {

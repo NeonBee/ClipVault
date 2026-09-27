@@ -41,6 +41,7 @@ import dev.clipvault.app.data.ClipItem
 import dev.clipvault.app.quickpaste.QuickPasteShortcut
 import dev.clipvault.app.security.BiometricVaultUnlock
 import dev.clipvault.app.security.VaultKeyManager
+import dev.clipvault.app.security.VaultLockLog
 import dev.clipvault.app.ui.ClipVaultUi
 import dev.clipvault.app.ui.VaultViewModel
 import dev.clipvault.app.ui.settings.AppLanguage
@@ -115,7 +116,7 @@ class MainActivity : AppCompatActivity() {
                     shizukuReady = shizukuReady,
                     captureEnabled = captureEnabled,
                     onUnlock = ::beginBiometricUnlock,
-                    onLock = ::lockVault,
+                    onLock = { app.lockVault(VaultLockLog.Reason.USER) },
                     onToggleCapture = ::toggleCapture,
                     onCopy = ::copyToClipboard,
                     onExportSelection = ::shareText,
@@ -165,8 +166,6 @@ class MainActivity : AppCompatActivity() {
         override fun onOpened(imported: Int) { viewModel.onVaultOpened(imported); restartCaptureIfEnabled() }
         override fun onFailure(message: String) = viewModel.setError(message)
     }
-
-    private fun lockVault() = app.lockVault()
 
     private fun toggleCapture() {
         if (captureEnabled) {
@@ -389,7 +388,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateCaptureState()
-        if (getSystemService(KeyguardManager::class.java).isDeviceLocked) lockVault()
+        if (getSystemService(KeyguardManager::class.java).isDeviceLocked) app.lockVault(VaultLockLog.Reason.DEVICE_LOCKED_MAIN)
         // The vault may have been unlocked from QuickPaste while this window was in the background.
         if (app.isUnlocked) viewModel.onVaultAvailable() else viewModel.onVaultLocked()
     }

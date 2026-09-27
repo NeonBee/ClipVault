@@ -2,6 +2,7 @@
 .SYNOPSIS
     WP-04 기기 검증 기록 수집: Android/One UI 버전과 bridge 모드(READY_EVENT / READY_POLL / DEGRADED)를
     markdown 표로 출력한다. clipboard 내용은 읽지 않는다.
+    WP-06: 최근 vault 잠금 사유(Lock log, 사유 코드와 기기 상태만)도 표로 덧붙인다.
 
 .DESCRIPTION
     Windows PowerShell 5.1 과 PowerShell 7 에서 동작한다.
@@ -83,6 +84,25 @@ function Get-Pref([string]$Xml, [string]$Name) {
     return ''
 }
 
+function Get-LockLog([string]$Xml) {
+    # lock_log 값은 여러 줄이다. SharedPreferences XML 은 줄바꿈을 그대로 두거나 &#10; 로 escape 하므로
+    # (?s) 로 여러 줄을 잡고 HtmlDecode 로 entity 를 푼다. 각 줄: 사유;시각ms;unlock후ms;창;interactive;keyguard;deviceLocked;DeX
+    $match = [regex]::Match($Xml, '(?s)<string name="lock_log">(.*?)</string>')
+    if (-not $match.Success) { return @() }
+    $decoded = [System.Net.WebUtility]::HtmlDecode($match.Groups[1].Value)
+    $events = @()
+    foreach ($line in ($decoded -split "`r?`n")) {
+        $parts = $line.Split(';')
+        if ($parts.Count -ne 8) { continue }
+        $events += ,$parts
+    }
+    return $events
+}
+
+function Format-Flag([string]$Value, [string]$WhenTrue, [string]$WhenFalse) {
+    switch ($Value) { '1' { return $WhenTrue } '0' { return $WhenFalse } default { return '?' } }
+}
+
 function Or-Default([string]$Value, [string]$Fallback) {
     if ([string]::IsNullOrEmpty($Value)) { return $Fallback }
     return $Value
@@ -116,6 +136,7 @@ if (-not $shizukuUser -and $shizukuManagerOnly) { $shizukuUser = '미실행(매�
 $prefsXml = (Invoke-Adb shell run-as $Package cat shared_prefs/clipvault_settings.xml) -join "`n"
 $bridgeState = Get-Pref $prefsXml 'bridge_state'
 $lastError = Get-Pref $prefsXml 'last_capture_error'
+$lockEvents = @(Get-LockLog $prefsXml)
 
 $testResult = '실행 안 함(-RunTest 로 실행)'
 if ($RunTest) {
@@ -181,6 +202,28 @@ $lines.Add('')
 $lines.Add('| 항목 | 값 |')
 $lines.Add('| --- | --- |')
 foreach ($row in $rows) { $lines.Add(('| {0} | {1} |' -f $row[0], $row[1])) }
+
+# WP-06 세션 연속성 진단: 최근 잠금 사유(최신이 위). 시각은 이 PC 의 현지 시각.
+$lines.Add('')
+$lines.Add('## Lock log')
+$lines.Add('')
+if ($lockEvents.Count -eq 0) {
+    $lines.Add('기록 없음(debug 빌드가 아니거나, 이 버전 설치 뒤 열린 vault 가 잠긴 적 없음).')
+} else {
+    # interactive = PowerManager.isInteractive()(기기 전원 상태). 특정 디스플레이의 켜짐/꺼짐이 아니다(DeX 는 외부 화면을 쓴다).
+    $lines.Add('| 시각 | 사유 | unlock 후 | 시작된 창 | interactive | keyguard | device locked | DeX |')
+    $lines.Add('| --- | --- | --- | --- | --- | --- | --- | --- |')
+    foreach ($event in $lockEvents) {
+        $at = [DateTimeOffset]::FromUnixTimeMilliseconds([long]$event[1]).ToLocalTime().ToString('MM-dd HH:mm:ss')
+        $since = '?'
+        if ([long]$event[2] -ge 0) { $since = ('{0:N1}s' -f ([long]$event[2] / 1000.0)) }
+        $windows = '?'
+        if ([int]$event[3] -ge 0) { $windows = $event[3] }
+        $lines.Add(('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} |' -f $at, $event[0], $since, $windows,
+            (Format-Flag $event[4] 'yes' 'no'), (Format-Flag $event[5] 'locked' '-'),
+            (Format-Flag $event[6] 'locked' '-'), (Format-Flag $event[7] 'DeX' '-')))
+    }
+}
 
 $lines | ForEach-Object { Write-Output $_ }
 if ($OutFile) {
