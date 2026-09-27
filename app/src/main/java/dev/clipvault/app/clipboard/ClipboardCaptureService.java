@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 import dev.clipvault.app.ClipVaultApp;
+import dev.clipvault.app.security.VaultLockLog;
 import dev.clipvault.app.MainActivity;
 import dev.clipvault.app.R;
 
@@ -71,7 +72,7 @@ public final class ClipboardCaptureService extends Service {
             return START_NOT_STICKY;
         }
         if (intent != null && ACTION_LOCK.equals(intent.getAction())) {
-            ((ClipVaultApp) getApplication()).lockVault();
+            ((ClipVaultApp) getApplication()).lockVault(VaultLockLog.Reason.NOTIFICATION);
             updateNotification();
             return START_STICKY;
         }

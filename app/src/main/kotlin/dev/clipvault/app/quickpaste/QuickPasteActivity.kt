@@ -21,6 +21,7 @@ import dev.clipvault.app.R
 import dev.clipvault.app.clipboard.SensitiveClipboard
 import dev.clipvault.app.security.BiometricVaultUnlock
 import dev.clipvault.app.security.VaultKeyManager
+import dev.clipvault.app.security.VaultLockLog
 import dev.clipvault.app.ui.settings.ThemeSettings
 import dev.clipvault.app.ui.theme.ClipVaultTheme
 
@@ -79,7 +80,7 @@ class QuickPasteActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (getSystemService(KeyguardManager::class.java).isDeviceLocked) app.lockVault()
+        if (getSystemService(KeyguardManager::class.java).isDeviceLocked) app.lockVault(VaultLockLog.Reason.DEVICE_LOCKED_QUICK_PASTE)
         if (app.isUnlocked) viewModel.onVaultOpen()
         else if (viewModel.state.value.gate == QuickPasteGate.READY) viewModel.onVaultLocked()
     }

@@ -2,6 +2,7 @@ package dev.clipvault.app;
 
 import android.app.Activity;
 import android.app.Application;
+import android.app.KeyguardManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -10,6 +11,8 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -24,7 +27,9 @@ import dev.clipvault.app.data.VaultRepository;
 import dev.clipvault.app.nativecore.NativeClassifier;
 import dev.clipvault.app.nativecore.TextAnalysis;
 import dev.clipvault.app.security.SecurePendingStore;
+import dev.clipvault.app.security.DesktopModes;
 import dev.clipvault.app.security.VaultAutoLock;
+import dev.clipvault.app.security.VaultLockLog;
 import dev.clipvault.app.workers.RetentionWorker;
 
 import rikka.shizuku.ShizukuProvider;
@@ -53,6 +58,10 @@ public final class ClipVaultApp extends Application {
     /** BridgeHealth.stateCode() of the running capture service; empty when it is stopped. */
     public static final String PREF_BRIDGE_STATE = "bridge_state";
     public static final String PREF_AUTO_LOCK_MS = "auto_lock_ms";
+    /** VaultLockLog: sanitized recent lock reasons, newest first. */
+    public static final String PREF_LOCK_LOG = "lock_log";
+    /** Wall-clock unlock time while the vault is open; left behind only if the process dies unlocked. */
+    public static final String PREF_VAULT_OPEN_MARKER = "vault_open_marker";
 
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "clipvault-io");
@@ -71,6 +80,9 @@ public final class ClipVaultApp extends Application {
     private VaultAutoLock autoLock;
     /** Incremented by every lockVault(); an unlock that started in an older epoch must not open the vault. */
     private final AtomicLong lockEpoch = new AtomicLong();
+    /** elapsedRealtime of the last successful unlock in this process, or -1. */
+    private volatile long unlockedAtElapsed = -1L;
+    private final Object lockLogGuard = new Object();
 
     @Override
     protected void attachBaseContext(Context base) {
@@ -86,6 +98,7 @@ public final class ClipVaultApp extends Application {
         pendingStore = new SecurePendingStore(this);
         settings = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         container = new AppContainer(this);
+        recordProcessRestartWhileOpen();
         installAutoLock();
         scheduleRetentionMaintenance();
     }
@@ -101,7 +114,8 @@ public final class ClipVaultApp extends Application {
             public void cancel(@NonNull Runnable task) {
                 mainHandler.removeCallbacks(task);
             }
-        }, () -> settings.getLong(PREF_AUTO_LOCK_MS, VaultAutoLock.DEFAULT_DELAY_MS), this::isUnlocked, this::lockVault);
+        }, () -> settings.getLong(PREF_AUTO_LOCK_MS, VaultAutoLock.DEFAULT_DELAY_MS), this::isUnlocked,
+                () -> lockVault(VaultLockLog.Reason.AUTO_LOCK_TIMEOUT));
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override public void onActivityStarted(@NonNull Activity activity) { autoLock.onActivityStarted(); }
             @Override public void onActivityStopped(@NonNull Activity activity) {
@@ -119,7 +133,7 @@ public final class ClipVaultApp extends Application {
         ContextCompat.registerReceiver(this, new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) lockVault();
+                if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) lockVault(VaultLockLog.Reason.SCREEN_OFF);
             }
         }, new IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_EXPORTED);
     }
@@ -193,6 +207,9 @@ public final class ClipVaultApp extends Application {
                 VaultRepository old = repository;
                 repository = opened;
                 unlocked = true;
+                unlockedAtElapsed = SystemClock.elapsedRealtime();
+                // Inside the epoch lock: a lockVault() that sees unlocked=true removes this marker after it.
+                settings.edit().putLong(PREF_VAULT_OPEN_MARKER, System.currentTimeMillis()).apply();
                 if (old != null) old.close();
             }
             mainHandler.post(() -> { if (autoLock != null) autoLock.onVaultUnlocked(); });
@@ -238,10 +255,18 @@ public final class ClipVaultApp extends Application {
 
     /** Idempotent; any thread. Lock listeners always run so every window drops decrypted state. */
     public void lockVault() {
+        lockVault(VaultLockLog.Reason.OTHER);
+    }
+
+    /** As {@link #lockVault()}, recording [reason] in the diagnostics lock log if the vault was open. */
+    public void lockVault(@NonNull VaultLockLog.Reason reason) {
+        boolean wasOpen;
         synchronized (lockEpoch) {
             lockEpoch.incrementAndGet();
+            wasOpen = unlocked;
             unlocked = false;
         }
+        if (wasOpen) recordLock(reason);
         ioExecutor.execute(() -> {
             VaultRepository closing = repository;
             repository = null;
@@ -274,7 +299,51 @@ public final class ClipVaultApp extends Application {
         pendingStore = new SecurePendingStore(this);
         ruleEngine.replace(java.util.Collections.emptyList());
         settings.edit().putBoolean(PREF_CAPTURE_ENABLED, false)
-                .putBoolean(PREF_MAINTENANCE_PENDING, false).apply();
+                .putBoolean(PREF_MAINTENANCE_PENDING, false).remove(PREF_VAULT_OPEN_MARKER).apply();
+    }
+
+    private void recordLock(@NonNull VaultLockLog.Reason reason) {
+        long since = unlockedAtElapsed >= 0 ? SystemClock.elapsedRealtime() - unlockedAtElapsed : VaultLockLog.UNKNOWN;
+        int windows = autoLock != null ? autoLock.startedActivities() : VaultLockLog.UNKNOWN;
+        appendLockEvent(snapshot(reason, since, windows));
+    }
+
+    /**
+     * A leftover open marker means the previous process ended (killed, crashed, rebooted) while the
+     * vault was unlocked. That drops the key without any lockVault() call, so record it explicitly.
+     */
+    private void recordProcessRestartWhileOpen() {
+        if (!settings.contains(PREF_VAULT_OPEN_MARKER)) return;
+        long openedAt = settings.getLong(PREF_VAULT_OPEN_MARKER, 0L);
+        long since = openedAt > 0 ? Math.max(0L, System.currentTimeMillis() - openedAt) : VaultLockLog.UNKNOWN;
+        appendLockEvent(snapshot(VaultLockLog.Reason.PROCESS_RESTART, since, VaultLockLog.UNKNOWN));
+    }
+
+    @NonNull
+    private VaultLockLog.Event snapshot(@NonNull VaultLockLog.Reason reason, long sinceUnlockMs, int windows) {
+        int interactive = VaultLockLog.UNKNOWN;
+        int keyguardLocked = VaultLockLog.UNKNOWN;
+        int deviceLocked = VaultLockLog.UNKNOWN;
+        try {
+            PowerManager power = getSystemService(PowerManager.class);
+            if (power != null) interactive = VaultLockLog.flag(power.isInteractive());
+            KeyguardManager keyguard = getSystemService(KeyguardManager.class);
+            if (keyguard != null) {
+                keyguardLocked = VaultLockLog.flag(keyguard.isKeyguardLocked());
+                deviceLocked = VaultLockLog.flag(keyguard.isDeviceLocked());
+            }
+        } catch (RuntimeException ignored) {
+            // Diagnostics must never break locking.
+        }
+        return new VaultLockLog.Event(reason, System.currentTimeMillis(), sinceUnlockMs, windows,
+                interactive, keyguardLocked, deviceLocked, DesktopModes.samsungDex(getResources().getConfiguration()));
+    }
+
+    private void appendLockEvent(@NonNull VaultLockLog.Event event) {
+        synchronized (lockLogGuard) {
+            String log = VaultLockLog.append(settings.getString(PREF_LOCK_LOG, ""), event);
+            settings.edit().putString(PREF_LOCK_LOG, log).remove(PREF_VAULT_OPEN_MARKER).apply();
+        }
     }
 
     /** The vault was locked while this unlock was in progress; the user must authenticate again. */
