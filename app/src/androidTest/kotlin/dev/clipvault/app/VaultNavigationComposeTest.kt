@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import org.junit.After
 import org.junit.Assert.assertNotNull
+import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -27,6 +28,9 @@ class VaultNavigationComposeTest {
     private val app get() = context.applicationContext as ClipVaultApp
 
     @Before fun unlockTestVault() {
+        // This test deletes clipvault.db; never run it against a real vault on a personal device.
+        assumeFalse("a real vault is provisioned on this device",
+            dev.clipvault.app.security.VaultKeyManager(context).isProvisioned)
         app.lockVault()
         app.io().submit {}.get(5, TimeUnit.SECONDS)
         context.deleteDatabase("clipvault.db")
@@ -36,6 +40,7 @@ class VaultNavigationComposeTest {
     }
 
     @After fun closeTestVault() {
+        if (dev.clipvault.app.security.VaultKeyManager(context).isProvisioned) return
         app.lockVault()
         app.io().submit {}.get(5, TimeUnit.SECONDS)
         context.deleteDatabase("clipvault.db")

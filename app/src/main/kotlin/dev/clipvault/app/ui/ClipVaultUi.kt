@@ -130,6 +130,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -329,39 +330,45 @@ private fun LibraryScreen(
 ) {
     val clips = viewModel.clips.collectAsLazyPagingItems()
     var sortMenu by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Column { Text(stringResource(R.string.library)); Text(stringResource(R.string.clip_count, state.stats.activeCount), style = MaterialTheme.typography.bodyMedium) } },
-            actions = {
-                BadgedBox(badge = { if (state.stats.trashCount > 0) Badge { Text(state.stats.trashCount.toString()) } }) {
-                    IconButton(onClick = onOpenTrash) { Icon(Icons.Default.Delete, stringResource(R.string.trash)) }
-                }
-                Box { IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, stringResource(R.string.sort)) }
-                    DropdownMenu(sortMenu, onDismissRequest = { sortMenu = false }) {
-                        ClipQuery.Sort.entries.forEach { sort -> DropdownMenuItem(
-                            text = { Text(sortLabel(sort)) }, leadingIcon = { if (state.query.sort == sort) Icon(Icons.Default.Check, null) },
-                            onClick = { viewModel.setSort(sort); sortMenu = false }) }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val showInlineSearch = LibraryLayout.showInlineSearch(maxHeight.value, state.query.search)
+        Column(Modifier.fillMaxSize()) {
+            TopAppBar(
+                title = { Column { Text(stringResource(R.string.library)); Text(stringResource(R.string.clip_count, state.stats.activeCount), style = MaterialTheme.typography.bodyMedium) } },
+                actions = {
+                    BadgedBox(badge = { if (state.stats.trashCount > 0) Badge { Text(state.stats.trashCount.toString()) } }) {
+                        IconButton(onClick = onOpenTrash) { Icon(Icons.Default.Delete, stringResource(R.string.trash)) }
                     }
+                    Box { IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, stringResource(R.string.sort)) }
+                        DropdownMenu(sortMenu, onDismissRequest = { sortMenu = false }) {
+                            ClipQuery.Sort.entries.forEach { sort -> DropdownMenuItem(
+                                text = { Text(sortLabel(sort)) }, leadingIcon = { if (state.query.sort == sort) Icon(Icons.Default.Check, null) },
+                                onClick = { viewModel.setSort(sort); sortMenu = false }) }
+                        }
+                    }
+                    IconButton(onClick = onOpenSearch) { Icon(Icons.Default.Tune, stringResource(R.string.advanced_search)) }
+                    IconButton(onClick = onLock) { Icon(Icons.Default.Lock, stringResource(R.string.lock)) }
+                }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background))
+            // Short windows (DeX freeform): hidden unless a query is active; Advanced Search stays in the top bar.
+            if (showInlineSearch) OutlinedTextField(value = state.query.search, onValueChange = viewModel::setSearch,
+                leadingIcon = { Icon(Icons.Default.Search, null) }, trailingIcon = { if (state.query.search.isNotEmpty()) IconButton(onClick = { viewModel.setSearch("") }) { Icon(Icons.Default.Close, null) } },
+                placeholder = { Text(stringResource(R.string.search_hint)) }, singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).testTag(LIBRARY_INLINE_SEARCH_TAG))
+            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                lazyItems(SmartFilter.entries, key = { it.name }) { filter ->
+                    FilterChip(selected = state.query.filter == filter && state.query.collectionId == null,
+                        onClick = { viewModel.setFilter(filter) }, label = { Text(filterLabel(filter)) })
                 }
-                IconButton(onClick = onOpenSearch) { Icon(Icons.Default.Tune, stringResource(R.string.advanced_search)) }
-                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, stringResource(R.string.lock)) }
-            }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background))
-        OutlinedTextField(value = state.query.search, onValueChange = viewModel::setSearch,
-            leadingIcon = { Icon(Icons.Default.Search, null) }, trailingIcon = { if (state.query.search.isNotEmpty()) IconButton(onClick = { viewModel.setSearch("") }) { Icon(Icons.Default.Close, null) } },
-            placeholder = { Text(stringResource(R.string.search_hint)) }, singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp))
-        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            lazyItems(SmartFilter.entries, key = { it.name }) { filter ->
-                FilterChip(selected = state.query.filter == filter && state.query.collectionId == null,
-                    onClick = { viewModel.setFilter(filter) }, label = { Text(filterLabel(filter)) })
             }
+            BulkSelectionBar(viewModel, state, onExportSelection)
+            ClipList(clips, state.selectedIds, viewModel::toggleSelection, onOpenDetail, onCopy,
+                viewModel::toggleFavorite, viewModel::togglePinned, viewModel::trash,
+                emptyLabel = stringResource(R.string.empty_library))
         }
-        BulkSelectionBar(viewModel, state, onExportSelection)
-        ClipList(clips, state.selectedIds, viewModel::toggleSelection, onOpenDetail, onCopy,
-            viewModel::toggleFavorite, viewModel::togglePinned, viewModel::trash,
-            emptyLabel = stringResource(R.string.empty_library))
     }
 }
+
+internal const val LIBRARY_INLINE_SEARCH_TAG = "library_inline_search"
 
 @Composable
 private fun BulkSelectionBar(

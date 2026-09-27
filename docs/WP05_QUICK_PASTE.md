@@ -6,7 +6,7 @@ Terminology: `PR #N` is a GitHub Pull Request number; `WP-NN` is a design Work P
 
 | Design item | Implementation |
 | --- | --- |
-| compact window | Manifest `<layout>` 560×620dp (min 360×400dp) for freeform/DeX launches; content capped at 640dp wide. Phones show it full screen. Fine-tuning belongs to WP-06. |
+| compact window | Manifest `<layout>` 560×620dp (min 280×260dp since WP-06; was 360×400dp) for freeform/DeX launches; content capped at 640dp wide. Phones show it full screen. Fine-tuning belongs to WP-06. |
 | `FLAG_SECURE` | Set before any content; `setRecentsScreenshotEnabled(false)` on API 33+. |
 | recents preview 없음 | `excludeFromRecents`, `autoRemoveFromRecents`, own `taskAffinity`, `finishAndRemoveTask()` on close. |
 | search autofocus | Search field requests focus and the soft keyboard when the vault is ready. |

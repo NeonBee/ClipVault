@@ -60,13 +60,15 @@
             android:launchMode="singleTask"
             android:taskAffinity="${applicationId}.quickpaste"
             android:windowSoftInputMode="stateVisible|adjustResize">
-            <!-- Initial freeform (DeX) window size; phones ignore it and show the window full screen. -->
+            <!-- Initial freeform (DeX) window size; phones ignore it and show the window full screen.
+                 The minimum is the only size floor (Compose sets none): 280x260dp still fits the search
+                 field, a few rows and the key hint (WP-06, QuickPasteCompactLayoutTest). -->
             <layout
                 android:defaultHeight="620dp"
                 android:defaultWidth="560dp"
                 android:gravity="center"
-                android:minHeight="400dp"
-                android:minWidth="360dp" />
+                android:minHeight="260dp"
+                android:minWidth="280dp" />
         </activity>
 
         <service

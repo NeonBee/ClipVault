@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
@@ -210,7 +212,9 @@ private fun ResultRow(item: ClipItem, selected: Boolean, modifier: Modifier, onC
 
 @Composable
 private fun StatusPane(title: String, message: String?, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally,
+    // Scrolls so the buttons stay reachable in the 260dp-high minimum freeform window.
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium)
         if (!message.isNullOrBlank()) {
