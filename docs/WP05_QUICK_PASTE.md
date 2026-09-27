@@ -34,16 +34,18 @@ Unlock race (review of PR #11): the database opens on the IO executor after the 
 
 ## Device check (Samsung DeX)
 
-Fill in on the WP-04 device (SM-S918N) after installing the debug build with `adb install -r` (never uninstall).
+Validated on the WP-04 device (SM-S918N) with the PR #11 debug build installed in-place using `adb install -r` / streaming install; app data was preserved.
 
 | Check | Expected | Result |
 | --- | --- | --- |
-| Long-press ClipVault icon (phone and DeX taskbar) | "Quick paste" shortcut is listed | PENDING |
-| Open with vault locked | Biometric prompt appears; cancel closes the window | PENDING |
-| Unlock from QuickPaste | Recent clips listed, search field focused | PENDING |
-| Type a word, ↑/↓, Enter | Matching list; Enter closes the window; Ctrl+V in another DeX app pastes the clip | PENDING |
-| Esc | Window closes | PENDING |
-| Screenshot / recents | Screenshot blocked; no Quick paste card in recents | PENDING |
-| Window size in DeX | Opens as a compact freeform window, resizable without losing the query | PENDING |
-| Minimise QuickPaste, wait > auto-lock timeout, open main app | Vault locked | PENDING |
-| Unlock from QuickPaste, then open main app | Main app shows the vault, no second prompt | PENDING |
+| Long-press ClipVault icon (phone and DeX taskbar) | "Quick paste" shortcut is listed | PASS |
+| Open with vault locked | Biometric prompt appears; cancel closes the window | PASS |
+| Unlock from QuickPaste | Recent clips listed, search field focused | PASS |
+| Type a word, ↑/↓, Enter | Matching list; Enter closes the window; Ctrl+V in another DeX app pastes the clip | PASS |
+| Esc | Window closes | PASS |
+| Screenshot / recents | Screenshot blocked; no Quick paste card in recents | PASS |
+| Window size in DeX | Opens as a compact freeform window, resizable without losing the query | PASS — resize/query retention works; current minimum window size is larger than desired. Reduce/tune the DeX minimum size in WP-06. |
+| Minimise QuickPaste, wait > auto-lock timeout, open main app | Vault locked | PASS — auto-lock starts once all ClipVault activities are background/stopped. DeX freeform lifecycle can make the exact start moment appear variable while a window remains foreground/started. |
+| Unlock from QuickPaste, then open main app | Main app shows the vault, no second prompt | PASS — confirmed within the configured 30 s auto-lock window. Reverse direction (MainActivity → QuickPaste) also shares the same unlocked vault without another biometric prompt. |
+
+Additional observation: an earlier QuickPaste → MainActivity retest appeared to require biometric authentication only because the configured auto-lock timeout had elapsed before the second activity was opened. Repeating both directions within the 30 s window passed, so this is not treated as a WP-05 blocker.
