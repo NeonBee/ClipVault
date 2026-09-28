@@ -16,6 +16,19 @@ ClipVault uses one Android application module with explicit boundaries instead o
   - *Payload limit:* text over 128,000 UTF-16 chars is rejected whole, never truncated, both in the UserService and in the capture coordinator. Diagnostics show `CAPTURE_REJECTED_TOO_LARGE`.
 - **Native analysis:** one JNI call returns normalized content, flags, sensitivity, canonical URL and domain. The Java fallback preserves capture if the native library cannot load.
 
+## Planned secure text transport (WP-07)
+
+The current implementation still uses the Android/system clipboard when a user restores a clip through `SensitiveClipboard`. That clipboard is a compatibility boundary, not part of ClipVault's encrypted trust boundary.
+
+WP-07 adds two explicit transports without replacing the normal clipboard path:
+
+- **Secure ingress:** a text-selection `ACTION_PROCESS_TEXT` Activity receives user-selected text and writes it to the authenticated vault without calling `ClipboardManager`.
+- **Secure egress:** a retrieval-only secondary `InputMethodService` searches the vault and inserts the selected value through the current editor's `InputConnection`, again without calling `ClipboardManager`.
+
+The planned IME does not replace Samsung Keyboard or another primary keyboard. It exists only as an on-demand retrieval/direct-insert surface and must not record general typing. QuickPaste remains the DeX/freeform retrieval surface and can share repository/search logic with the IME while using a different output transport.
+
+The secure path is deliberately not implemented with Accessibility Service, vendor keyboard hooks or UI injection. If direct ingress/egress is unavailable, the secure operation fails instead of silently falling back to the system clipboard. See `WP07_SECURE_TEXT_BOUNDARY.md`.
+
 ## Data invariants
 
 - `content_hash` is unique over normalized UTF-8 content.
