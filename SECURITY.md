@@ -25,10 +25,24 @@ There is intentionally no recovery key, server escrow or bypass. Losing or inval
 - QuickPaste has no plaintext cache: it shows vault content only while the vault is unlocked through the same `BiometricPrompt` + `CryptoObject` path, cannot enroll a new key, is not exported, is excluded from recents with its thumbnail disabled, never persists the search query and closes when hidden. It restores a clip to the clipboard only; it does not inject input or auto-paste.
 - Foreground notifications contain status only, never clipboard content.
 - Copied-back clips use `EXTRA_IS_SENSITIVE` where supported.
+- **The Android/system clipboard is outside ClipVault's encrypted trust boundary.** `EXTRA_IS_SENSITIVE` is treated as a display/privacy hint, not as a confidentiality guarantee. Once plaintext is copied back, vendor clipboard history, keyboard clipboard UI, cross-device clipboard features and other platform-permitted handling are outside ClipVault's control.
 - Vault lock drops repository access immediately and closes SQLCipher on the serialized I/O executor.
 - Screen-off/background timeout and explicit notification lock are supported. The background timeout starts only when no ClipVault window is visible, covers vaults unlocked from QuickPaste, and is armed when an unlock completes after the window was already hidden. A lock during an unlock invalidates it (lock epoch), so a late database open cannot reopen the vault.
 - Likely OTP, password/token phrases and payment numbers are skipped by default.
 - Lock diagnostics keep only reason codes, timestamps and device-state flags for the last 8 locks; no clipboard content, search text or key material. Samsung DeX detection is used for diagnostics only and never as an authentication factor.
+
+## Planned secure text path
+
+WP-07 defines an optional path for sensitive text that avoids the Android/system clipboard in both directions:
+
+- **Secure Copy:** explicit text selection is delivered to ClipVault through Android text-processing integration and stored in the authenticated vault without using `ClipboardManager`.
+- **Secure Paste:** a retrieval-only ClipVault secondary IME inserts a selected vault item directly into the current editor through `InputConnection`.
+
+This path is intentionally designed without Accessibility Service, Samsung Keyboard hooks, arbitrary UI injection or a new network boundary. Samsung Keyboard remains the normal primary IME; ClipVault's planned IME is an on-demand retrieval surface only.
+
+WP-07 is a **planned design, not a current release guarantee**. Until its clipboard non-interference tests pass, users must assume that the existing normal Copy/QuickPaste restore path exposes plaintext to the system clipboard.
+
+See [docs/WP07_SECURE_TEXT_BOUNDARY.md](docs/WP07_SECURE_TEXT_BOUNDARY.md) and [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 ## Shizuku boundary
 
@@ -40,4 +54,4 @@ The application does not request `android.permission.INTERNET`. It contains no a
 
 ## Limitations
 
-ClipVault cannot protect plaintext from a compromised OS, root process, malicious accessibility service, process injection or memory inspection while the vault is unlocked. It is not a replacement for a separately audited password manager. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the complete boundary.
+ClipVault cannot protect plaintext from a compromised OS, root process, malicious accessibility service, process injection or memory inspection while the vault is unlocked. It also cannot protect plaintext after the user explicitly sends it through the normal system clipboard path. It is not a replacement for a separately audited password manager. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the complete boundary.
