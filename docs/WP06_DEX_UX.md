@@ -147,7 +147,7 @@ powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1
 
 두 문제는 성격이 다르다. 1번은 창 자체의 크기 문제이고, 2번은 폭 문제이므로 **높이 하한과 폭 하한을 모두 manifest `<layout>` 로 지정**한다. Compose 레벨에서 최소 레이아웃을 유지하는 대신 창을 아예 줄이지 못하게 하는 이유는, 사용자가 창을 줄였는데 아무 반응이 없는 상태가 더 나쁘기 때문이다.
 
-### 높이 하한 380dp
+### 높이 하한 384dp
 
 `LibraryLayout` 의 예산으로 도출한다.
 
@@ -159,14 +159,14 @@ powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1
 | ClipList padding | LazyColumn contentPadding 12×2 | 24 |
 | bottom menu | Material 3 navigation bar | 80 |
 | **합계** | | **358** |
-| **선택한 하한** | 본문 2줄 card(+24) 여유 포함 | **380** |
+| **선택한 하한** | 358 + 본문 2줄 card(+24) = 382dp를 넘도록 정렬 | **384** |
 
 이 값은 추정이 아니다. `LibraryLayout.MIN_USABLE_HEIGHT_BUDGET_DP` 로 코드에 고정하고 `LibraryLayoutTest` 가
 "하한 ≥ 예산 + 24dp"를 검사하므로, library 행이 늘어 예산을 넘어가면 테스트가 실패한다.
 manifest 는 Kotlin 상수를 읽을 수 없으므로 **`<layout>` 값이 이 예산과 어긋나면 테스트는 잡아내지 못한다.**
 값을 바꿀 때는 양쪽을 같이 고쳐야 한다.
 
-`COMPACT_HEIGHT_DP = 420`(inline 검색창 숨김 기준)은 별개의 기준이므로 그대로 둔다. 즉 380~420dp 구간에서는
+`COMPACT_HEIGHT_DP = 420`(inline 검색창 숨김 기준)은 별개의 기준이므로 그대로 둔다. 즉 384~420dp 구간에서는
 창은 더 줄일 수 없지만 검색창은 숨겨진다.
 
 ### 폭 하한 320dp
@@ -192,7 +192,7 @@ TopAppBar 액션 IconButton 4개(48×4 = 192dp) + 읽을 만한 title 슬롯(112
 
 | 확인 | 기대 결과 | 결과 |
 | --- | --- | --- |
-| 메인 창을 가장 작게 줄이기 | 약 380dp 에서 멈춤 | PENDING |
+| 메인 창을 가장 작게 줄이기 | 약 384dp 에서 멈춤 | PENDING |
 | 최소 크기에서 필터 칩 + clip 1개 + bottom menu | 셋이 동시에 보임 | PENDING |
 | 최소 크기에서 TopAppBar 액션 4개 | Trash·Sort·Advanced Search·Lock 이 모두 보임 | PENDING |
 | QuickPaste 창을 가장 작게 줄이기 | 약 240×260dp 에서 멈춤 | PENDING |
