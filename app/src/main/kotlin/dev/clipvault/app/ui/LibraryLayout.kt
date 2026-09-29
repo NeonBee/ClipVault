@@ -19,7 +19,7 @@ internal object LibraryLayout {
      * library shows filter chips but no clip at all. [MIN_USABLE_WIDTH_DP] does the same for the
      * top bar actions.
      */
-    const val MIN_USABLE_HEIGHT_DP = 380
+    const val MIN_USABLE_HEIGHT_DP = 384
 
     /** Four 48dp top bar actions plus a readable title slot; narrower and the actions overflow. */
     const val MIN_USABLE_WIDTH_DP = 320
