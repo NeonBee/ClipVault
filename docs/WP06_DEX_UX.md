@@ -105,3 +105,35 @@ powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1
 - 포커스 동작 조정
 - 알림 / Quick Settings / 작업표시줄 진입점
 - 확인된 원인에 따른 session continuity / lock 정책 조정
+
+## 2단계 — compact 높이 레이아웃과 QuickPaste 최소 창 크기
+
+### 메인 vault 라이브러리
+
+- 라이브러리 화면이 실제로 받는 높이가 **420dp 미만**이면 inline 검색창을 숨긴다. 상단 바, 검색창, 필터 칩이 약 180dp 를 차지하므로, 이 기준 아래에서는 목록 높이가 240dp 미만으로 줄어든다.
+- 검색은 TopAppBar 의 Advanced Search(조정 아이콘)로 계속 할 수 있다. 같은 검색어(`query.search`)를 편집한다.
+- 예외: 검색어가 입력돼 있으면 좁아도 검색창을 유지한다. 필터가 걸린 상태가 보이지 않으면 결과가 왜 줄었는지 알 수 없고 지울 방법도 없기 때문이다.
+- 판정은 `LibraryLayout.showInlineSearch` 한 곳에서 하며, unit test 와 compose test(`LibraryCompactHeightComposeTest`)로 확인한다.
+
+### QuickPaste 최소 창 크기
+
+- manifest `<layout>` 최소 크기를 360×400dp → **280×260dp** 로 줄였다. 기본 크기 560×620dp 는 그대로 둔다. Compose 쪽에는 별도 최소 크기 제약이 없으므로 manifest 값이 유일한 하한이다.
+- 잠금·설정 화면은 상단 여백을 48dp → 16dp 로 줄이고 세로 스크롤을 줘서, 260dp 높이에서도 버튼이 잘리지 않는다.
+- `QuickPasteCompactLayoutTest` 가 280×260dp 에서 다음을 확인한다.
+  - 검색 필드 포커스, 첫 행, 키 안내 표시
+  - ↓ 로 보이는 범위 밖의 행을 선택하면 목록이 스크롤됨
+  - Enter 복사, Esc 닫기
+  - 잠금 화면 Unlock 버튼 도달
+
+### 실기기 확인 (SM-S918N, DeX)
+
+`adb install -r` 로 덮어 설치한다(삭제 금지).
+
+| 확인 | 기대 결과 | 결과 |
+| --- | --- | --- |
+| QuickPaste 창을 가장 작게 줄이기 | 약 280×260dp 에서 멈춤 | PENDING |
+| 최소 크기에서 입력, ↑/↓, Enter | 검색 필드·목록·키 안내가 보이고, 선택 행이 보이는 범위로 스크롤, Enter 로 복사 후 닫힘 | PENDING |
+| 최소 크기에서 Esc | 창 닫힘 | PENDING |
+| 최소 크기에서 잠긴 상태로 열기 | Unlock·Close 버튼 도달 가능 | PENDING |
+| 메인 앱 창 높이를 낮게 줄이기 | inline 검색창이 사라지고 목록이 더 길어짐. 상단 조정 아이콘으로 Advanced Search 진입 가능 | PENDING |
+| 낮은 창에서 Advanced Search 로 검색어 입력 후 돌아오기 | 검색어가 있는 동안 inline 검색창이 다시 보이고 지울 수 있음 | PENDING |
