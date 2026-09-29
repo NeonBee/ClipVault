@@ -50,10 +50,10 @@
                  can be resized until the library shows filter chips but no clip, and until the four
                  top bar actions overflow. The floor is the smallest usable vault viewport: top bar
                  (64) + filter chips (48) + one clip card (142) + list padding (24) + bottom menu (80)
-                 = 358dp, rounded up to 380dp for a two-line card body. The inline search stays
+                 = 358dp; a two-line body requires +24dp (382dp), so the floor is rounded up to 384dp. The inline search stays
                  hidden below LibraryLayout.COMPACT_HEIGHT_DP, which is a separate threshold. -->
             <layout
-                android:minHeight="380dp"
+                android:minHeight="384dp"
                 android:minWidth="320dp" />
         </activity>
 
