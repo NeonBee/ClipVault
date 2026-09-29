@@ -119,7 +119,7 @@ powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1
 
 - manifest `<layout>` 최소 크기를 360×400dp → **280×260dp** 로 줄였다. 기본 크기 560×620dp 는 그대로 둔다. Compose 쪽에는 별도 최소 크기 제약이 없으므로 manifest 값이 유일한 하한이다.
 - 잠금·설정 화면은 상단 여백을 48dp → 16dp 로 줄이고 세로 스크롤을 줘서, 260dp 높이에서도 버튼이 잘리지 않는다.
-- `QuickPasteCompactLayoutTest` 가 280×260dp 에서 다음을 확인한다.
+- `QuickPasteCompactLayoutTest` 가 최소 크기에서 다음을 확인한다(2단계 시점에는 280×260dp, 3단계에서 240×260dp 로 변경).
   - 검색 필드 포커스, 첫 행, 키 안내 표시
   - ↓ 로 보이는 범위 밖의 행을 선택하면 목록이 스크롤됨
   - Enter 복사, Esc 닫기
@@ -131,9 +131,70 @@ powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1
 
 | 확인 | 기대 결과 | 결과 |
 | --- | --- | --- |
-| QuickPaste 창을 가장 작게 줄이기 | 약 280×260dp 에서 멈춤 | PENDING |
-| 최소 크기에서 입력, ↑/↓, Enter | 검색 필드·목록·키 안내가 보이고, 선택 행이 보이는 범위로 스크롤, Enter 로 복사 후 닫힘 | PENDING |
-| 최소 크기에서 Esc | 창 닫힘 | PENDING |
-| 최소 크기에서 잠긴 상태로 열기 | Unlock·Close 버튼 도달 가능 | PENDING |
-| 메인 앱 창 높이를 낮게 줄이기 | inline 검색창이 사라지고 목록이 더 길어짐. 상단 조정 아이콘으로 Advanced Search 진입 가능 | PENDING |
-| 낮은 창에서 Advanced Search 로 검색어 입력 후 돌아오기 | 검색어가 있는 동안 inline 검색창이 다시 보이고 지울 수 있음 | PENDING |
+| QuickPaste 창을 가장 작게 줄이기 | 약 280×260dp 에서 멈춤 | PASS (2026-09-29) |
+| 최소 크기에서 입력, ↑/↓, Enter | 검색 필드·목록·키 안내가 보이고, 선택 행이 보이는 범위로 스크롤, Enter 로 복사 후 닫힘 | PASS (2026-09-29) |
+| 최소 크기에서 Esc | 창 닫힘 | PASS (2026-09-29) |
+| 최소 크기에서 잠긴 상태로 열기 | Unlock·Close 버튼 도달 가능 | PASS (2026-09-29) |
+| 메인 앱 창 높이를 낮게 줄이기 | inline 검색창이 사라지고 목록이 더 길어짐. 상단 조정 아이콘으로 Advanced Search 진입 가능 | PARTIAL (2026-09-29) — 검색창 숨김과 Advanced Search 진입은 확인. 다만 더 줄이면 clip 이 하나도 안 보이고 일부 액션이 잘림 |
+| 낮은 창에서 Advanced Search 로 검색어 입력 후 돌아오기 | 검색어가 있는 동안 inline 검색창이 다시 보이고 지울 수 있음 | PASS (2026-09-29) — 의도대로 유지됨 |
+
+## 3단계 — 최소 사용 가능 viewport
+
+2단계 실기기 관측(PR #13, 2026-09-29)에서 2가지 문제가 확인되었다.
+
+1. MainActivity 에 `<layout>` 이 없어 freeform 창 크기 하한이 전혀 없었다. 창을 계속 줄이면 **필터 칩만 보이고 clip 은 하나도 보이지 않는** 상태까지 허용된다.
+2. 폭이 좁아지면 `LibraryScreen` 의 TopAppBar 액션 4개(Trash·Sort·Advanced Search·Lock)가 title 을 밀어내 잘린다.
+
+두 문제는 성격이 다르다. 1번은 창 자체의 크기 문제이고, 2번은 폭 문제이므로 **높이 하한과 폭 하한을 모두 manifest `<layout>` 로 지정**한다. Compose 레벨에서 최소 레이아웃을 유지하는 대신 창을 아예 줄이지 못하게 하는 이유는, 사용자가 창을 줄였는데 아무 반응이 없는 상태가 더 나쁘기 때문이다.
+
+### 높이 하한 380dp
+
+`LibraryLayout` 의 예산으로 도출한다.
+
+| 구성 요소 | 근거 | dp |
+| --- | --- | --- |
+| TopAppBar | Material 3 small top app bar | 64 |
+| 필터 칩 LazyRow | FilterChip 32 + contentPadding 8×2 | 48 |
+| ClipCard 최소 | padding 16×2 + title 20 + body 1줄 24 + 액션 행 48 + gap 9×2 | 142 |
+| ClipList padding | LazyColumn contentPadding 12×2 | 24 |
+| bottom menu | Material 3 navigation bar | 80 |
+| **합계** | | **358** |
+| **선택한 하한** | 본문 2줄 card(+24) 여유 포함 | **380** |
+
+이 값은 추정이 아니다. `LibraryLayout.MIN_USABLE_HEIGHT_BUDGET_DP` 로 코드에 고정하고 `LibraryLayoutTest` 가
+"하한 ≥ 예산 + 24dp"를 검사하므로, library 행이 늘어 예산을 넘어가면 테스트가 실패한다.
+manifest 는 Kotlin 상수를 읽을 수 없으므로 **`<layout>` 값이 이 예산과 어긋나면 테스트는 잡아내지 못한다.**
+값을 바꿀 때는 양쪽을 같이 고쳐야 한다.
+
+`COMPACT_HEIGHT_DP = 420`(inline 검색창 숨김 기준)은 별개의 기준이므로 그대로 둔다. 즉 380~420dp 구간에서는
+창은 더 줄일 수 없지만 검색창은 숨겨진다.
+
+### 폭 하한 320dp
+
+TopAppBar 액션 IconButton 4개(48×4 = 192dp) + 읽을 만한 title 슬롯(112dp) + 여백(16dp) = 320dp.
+이보다 좁으면 액션이 overflow 되어 잠금 버튼을 포함한 필수 조작이 사라진다.
+
+### QuickPaste 최소 폭 240dp
+
+2단계 관측에서 QuickPaste 최소 크기(280×260dp)는 "보조창으로 써도 충분하다"는 확인을 받았고,
+**가로 폭만** 추가 축소를 원했다. 세로 260dp 는 그대로 둔다.
+
+240dp 에서 content 폭은 208dp 이다.
+
+- `Close` + `Unlock vault` 버튼 합이 약 190dp 로 빡빡하게 들어간다. 잘린 Unlock 버튼은 두 줄로 바꾼
+  것보다 나쁘므로 잠금·설정 화면의 버튼 행을 `Row` 에서 `FlowRow` 로 바꿔 줄바꿈을 허용한다.
+- 키 안내 문구(`"↑↓ select · Enter copy · Esc close"`)가 208dp 에서 2줄로 감긴다. 높이는 LazyColumn 이
+  `weight(1f)` 로 흡수하므로 목록이 한 행 줄어들 뿐 창이 깨지지 않는다.
+
+### 실기기 확인 (SM-S918N, DeX) — 3단계
+
+`adb install -r` 로 덮어 설치한다(삭제 금지).
+
+| 확인 | 기대 결과 | 결과 |
+| --- | --- | --- |
+| 메인 창을 가장 작게 줄이기 | 약 380dp 에서 멈춤 | PENDING |
+| 최소 크기에서 필터 칩 + clip 1개 + bottom menu | 셋이 동시에 보임 | PENDING |
+| 최소 크기에서 TopAppBar 액션 4개 | Trash·Sort·Advanced Search·Lock 이 모두 보임 | PENDING |
+| QuickPaste 창을 가장 작게 줄이기 | 약 240×260dp 에서 멈춤 | PENDING |
+| QuickPaste 최소 폭에서 잠긴 상태로 열기 | Close·Unlock 이 잘리지 않고 둘 다 보임 또는 줄바꿈 | PENDING |
+| QuickPaste 최소 폭에서 키 안내 문구 | 잘리지 않고 읽힘(줄바꿈 허용) | PENDING |
