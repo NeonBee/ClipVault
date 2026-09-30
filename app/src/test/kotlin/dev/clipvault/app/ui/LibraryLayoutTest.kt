@@ -6,15 +6,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LibraryLayoutTest {
-    @Test fun inlineSearchHidesOnlyBelowTheCompactHeight() {
-        assertTrue(LibraryLayout.showInlineSearch(LibraryLayout.COMPACT_HEIGHT_DP.toFloat(), ""))
-        assertTrue(LibraryLayout.showInlineSearch(800f, ""))
-        assertFalse(LibraryLayout.showInlineSearch(LibraryLayout.COMPACT_HEIGHT_DP - 0.5f, ""))
-        assertFalse(LibraryLayout.showInlineSearch(260f, ""))
+    @Test fun fullHeightAlwaysShowsInlineSearch() {
+        assertTrue(LibraryLayout.showInlineSearch(LibraryLayout.COMPACT_HEIGHT_DP.toFloat(), false))
+        assertTrue(LibraryLayout.showInlineSearch(800f, false))
     }
 
-    @Test fun activeQueryKeepsTheFieldSoTheFilterStaysVisibleAndClearable() {
-        assertTrue(LibraryLayout.showInlineSearch(260f, "invoice"))
+    @Test fun compactHeightRequiresExplicitExpansion() {
+        val compact = LibraryLayout.COMPACT_HEIGHT_DP - 0.5f
+        assertTrue(LibraryLayout.isCompactHeight(compact))
+        assertFalse(LibraryLayout.showInlineSearch(compact, false))
+        assertTrue(LibraryLayout.showInlineSearch(compact, true))
     }
 
     /**
@@ -29,8 +30,11 @@ class LibraryLayoutTest {
         )
     }
 
-    /** Four 48dp top bar actions plus a readable title slot; the width floor keeps them from overflowing. */
-    @Test fun theWidthFloorFitsTheTopBarActionsAndTheTitle() {
-        assertTrue(LibraryLayout.MIN_USABLE_WIDTH_DP >= 4 * 48 + 112 + 16)
+    /**
+     * Compact top bar keeps the 320dp floor by trading the two-line title for a 64dp one-line title:
+     * four actions + search affordance + compact title + spacing.
+     */
+    @Test fun theWidthFloorFitsCompactSearchAndTopBarActions() {
+        assertTrue(LibraryLayout.MIN_USABLE_WIDTH_DP >= 4 * 48 + 48 + 64 + 16)
     }
 }
