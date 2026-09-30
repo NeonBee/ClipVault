@@ -110,10 +110,12 @@ powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1
 
 ### 메인 vault 라이브러리
 
-- 라이브러리 화면이 실제로 받는 높이가 **420dp 미만**이면 inline 검색창을 숨긴다. 상단 바, 검색창, 필터 칩이 약 180dp 를 차지하므로, 이 기준 아래에서는 목록 높이가 240dp 미만으로 줄어든다.
-- 검색은 TopAppBar 의 Advanced Search(조정 아이콘)로 계속 할 수 있다. 같은 검색어(`query.search`)를 편집한다.
-- 예외: 검색어가 입력돼 있으면 좁아도 검색창을 유지한다. 필터가 걸린 상태가 보이지 않으면 결과가 왜 줄었는지 알 수 없고 지울 방법도 없기 때문이다.
-- 판정은 `LibraryLayout.showInlineSearch` 한 곳에서 하며, unit test 와 compose test(`LibraryCompactHeightComposeTest`)로 확인한다.
+- 2단계 최초 구현에서는 라이브러리 높이가 **420dp 미만**이면 inline 검색창을 숨기고 Advanced Search만 남겼다.
+- 실기기 확인 후 이 동작은 원래 요구사항과 다르다고 판정했다. 목표는 검색 기능을 Advanced Search로 대체하는 것이 아니라, **빠른 검색창을 compact 상태에서 최상단 좌측 돋보기로 축약하고 필요할 때 다시 펼치는 것**이다.
+- 3단계 보완부터 compact 상태에서는 좌측 검색 affordance를 표시한다. 누르면 inline 검색창이 다시 나타나며 focus를 받는다.
+- 검색어가 있어도 검색창을 강제로 펼치지 않는다. 사용자가 다시 접을 수 있고, 접힌 상태에서는 돋보기 badge로 active query를 표시한다.
+- Advanced Search(조정 아이콘)는 빠른 검색과 별개 기능으로 그대로 유지한다.
+- 판정은 `LibraryLayout.isCompactHeight` / `showInlineSearch`와 compose test(`LibraryCompactHeightComposeTest`)로 확인한다.
 
 ### QuickPaste 최소 창 크기
 
@@ -166,13 +168,14 @@ powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1
 manifest 는 Kotlin 상수를 읽을 수 없으므로 **`<layout>` 값이 이 예산과 어긋나면 테스트는 잡아내지 못한다.**
 값을 바꿀 때는 양쪽을 같이 고쳐야 한다.
 
-`COMPACT_HEIGHT_DP = 420`(inline 검색창 숨김 기준)은 별개의 기준이므로 그대로 둔다. 즉 384~420dp 구간에서는
-창은 더 줄일 수 없지만 검색창은 숨겨진다.
+`COMPACT_HEIGHT_DP = 420`은 inline 빠른 검색을 compact affordance로 접는 기준이다. 즉 384~420dp 구간에서는
+창은 더 줄일 수 없지만 inline 검색창 대신 좌측 돋보기가 기본으로 보이며, 사용자가 누르면 다시 펼칠 수 있다.
 
 ### 폭 하한 320dp
 
-TopAppBar 액션 IconButton 4개(48×4 = 192dp) + 읽을 만한 title 슬롯(112dp) + 여백(16dp) = 320dp.
-이보다 좁으면 액션이 overflow 되어 잠금 버튼을 포함한 필수 조작이 사라진다.
+일반 높이에서는 TopAppBar 액션 IconButton 4개(48×4 = 192dp) + title 슬롯(112dp) + 여백(16dp) = 320dp 이다.
+compact 높이에서는 좌측 검색 affordance 48dp가 추가되므로 제목을 1줄 `titleMedium`으로 줄여 64dp budget을 사용한다.
+따라서 192 + 48 + 64 + 16 = **320dp**로 같은 폭 하한을 유지한다. 이보다 좁으면 필수 조작이 overflow 될 수 있다.
 
 ### QuickPaste 최소 폭 240dp
 
@@ -192,9 +195,13 @@ TopAppBar 액션 IconButton 4개(48×4 = 192dp) + 읽을 만한 title 슬롯(112
 
 | 확인 | 기대 결과 | 결과 |
 | --- | --- | --- |
-| 메인 창을 가장 작게 줄이기 | 약 384dp 에서 멈춤 | PENDING |
-| 최소 크기에서 필터 칩 + clip 1개 + bottom menu | 셋이 동시에 보임 | PENDING |
-| 최소 크기에서 TopAppBar 액션 4개 | Trash·Sort·Advanced Search·Lock 이 모두 보임 | PENDING |
-| QuickPaste 창을 가장 작게 줄이기 | 약 240×260dp 에서 멈춤 | PENDING |
-| QuickPaste 최소 폭에서 잠긴 상태로 열기 | Close·Unlock 이 잘리지 않고 둘 다 보임 또는 줄바꿈 | PENDING |
-| QuickPaste 최소 폭에서 키 안내 문구 | 잘리지 않고 읽힘(줄바꿈 허용) | PENDING |
+| 메인 창을 가장 작게 줄이기 | 약 384dp 에서 멈춤 | PASS (2026-09-30) |
+| 최소 크기에서 필터 칩 + clip 1개 + bottom menu | 셋이 동시에 보임 | PASS (2026-09-30) |
+| 최소 크기에서 TopAppBar 액션 4개 | Trash·Sort·Advanced Search·Lock 이 모두 보임 | PASS (2026-09-30) |
+| QuickPaste 창을 가장 작게 줄이기 | 약 240×260dp 에서 멈춤 | PASS (2026-09-30) |
+| QuickPaste 최소 폭에서 잠긴 상태로 열기 | Close·Unlock 이 잘리지 않고 둘 다 보임 또는 줄바꿈 | PASS (2026-09-30) |
+| QuickPaste 최소 폭에서 키 안내 문구 | 잘리지 않고 읽힘(줄바꿈 허용) | PASS (2026-09-30) |
+| compact 진입 시 빠른 검색 | inline 검색창 대신 최상단 좌측 돋보기가 표시됨 | PENDING |
+| compact 돋보기 클릭 | inline 검색창이 펼쳐지고 즉시 focus 됨 | PENDING |
+| 검색어가 있는 상태에서 다시 접기 | 결과/filter는 유지되고 검색창만 접힘; 돋보기에 active badge 표시 | PENDING |
+| 창 높이를 420dp 이상으로 복구 | 일반 inline 검색창이 자동 복귀 | PENDING |
