@@ -99,5 +99,11 @@ class LibraryCompactHeightComposeTest {
         windowHeight = 800.dp
         compose.waitForIdle()
         compose.onNodeWithTag(LIBRARY_INLINE_SEARCH_TAG).assertIsDisplayed()
+
+        // Entering compact mode again starts collapsed, even though the active query is preserved.
+        windowHeight = 400.dp
+        compose.waitForIdle()
+        compose.onNodeWithTag(LIBRARY_INLINE_SEARCH_TAG).assertDoesNotExist()
+        compose.onNodeWithContentDescription(search).assertIsDisplayed()
     }
 }
