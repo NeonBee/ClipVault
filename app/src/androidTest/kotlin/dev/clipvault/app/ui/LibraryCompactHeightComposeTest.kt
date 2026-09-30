@@ -58,7 +58,7 @@ class LibraryCompactHeightComposeTest {
         }
         compose.setContent {
             ClipVaultTheme(ThemeSettings()) {
-                Box(Modifier.width(420.dp).height(windowHeight)) {
+                Box(Modifier.width(320.dp).height(windowHeight)) {
                     ClipVaultUi(viewModel, ThemeSettings(), shizukuReady = false, captureEnabled = false,
                         onUnlock = {}, onLock = {}, onToggleCapture = {}, onCopy = {}, onExportSelection = {},
                         onExportBackup = {}, onImportBackup = {})
@@ -69,6 +69,9 @@ class LibraryCompactHeightComposeTest {
         val advancedSearch = compose.activity.getString(R.string.advanced_search)
         val search = compose.activity.getString(R.string.search)
         val closeSearch = compose.activity.getString(R.string.close_search)
+        val trash = compose.activity.getString(R.string.trash)
+        val sort = compose.activity.getString(R.string.sort)
+        val lock = compose.activity.getString(R.string.lock)
 
         compose.onNodeWithTag(LIBRARY_INLINE_SEARCH_TAG).assertIsDisplayed()
         compose.onNodeWithTag(LIBRARY_COMPACT_SEARCH_TAG).assertDoesNotExist()
@@ -78,7 +81,10 @@ class LibraryCompactHeightComposeTest {
         compose.waitForIdle()
         compose.onNodeWithTag(LIBRARY_INLINE_SEARCH_TAG).assertDoesNotExist()
         compose.onNodeWithContentDescription(search).assertIsDisplayed()
+        compose.onNodeWithContentDescription(trash).assertIsDisplayed()
+        compose.onNodeWithContentDescription(sort).assertIsDisplayed()
         compose.onNodeWithContentDescription(advancedSearch).assertIsDisplayed()
+        compose.onNodeWithContentDescription(lock).assertIsDisplayed()
 
         compose.onNodeWithContentDescription(search).performClick()
         compose.onNodeWithTag(LIBRARY_INLINE_SEARCH_TAG).assertIsDisplayed().assertIsFocused()
