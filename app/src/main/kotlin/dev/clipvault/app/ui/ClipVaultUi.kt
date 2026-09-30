@@ -129,6 +129,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -330,11 +332,48 @@ private fun LibraryScreen(
 ) {
     val clips = viewModel.clips.collectAsLazyPagingItems()
     var sortMenu by remember { mutableStateOf(false) }
+    var compactSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val showInlineSearch = LibraryLayout.showInlineSearch(maxHeight.value, state.query.search)
+        val compactHeight = LibraryLayout.isCompactHeight(maxHeight.value)
+        val showInlineSearch = LibraryLayout.showInlineSearch(maxHeight.value, compactSearchExpanded)
+        LaunchedEffect(compactHeight, compactSearchExpanded) {
+            if (compactHeight && compactSearchExpanded) searchFocusRequester.requestFocus()
+        }
         Column(Modifier.fillMaxSize()) {
             TopAppBar(
-                title = { Column { Text(stringResource(R.string.library)); Text(stringResource(R.string.clip_count, state.stats.activeCount), style = MaterialTheme.typography.bodyMedium) } },
+                navigationIcon = {
+                    if (compactHeight) {
+                        BadgedBox(badge = {
+                            if (!compactSearchExpanded && state.query.search.isNotEmpty()) Badge()
+                        }) {
+                            IconButton(
+                                onClick = { compactSearchExpanded = !compactSearchExpanded },
+                                modifier = Modifier.testTag(LIBRARY_COMPACT_SEARCH_TAG),
+                            ) {
+                                Icon(
+                                    if (compactSearchExpanded) Icons.Default.Close else Icons.Default.Search,
+                                    stringResource(if (compactSearchExpanded) R.string.close_search else R.string.search),
+                                )
+                            }
+                        }
+                    }
+                },
+                title = {
+                    if (compactHeight) {
+                        Text(
+                            stringResource(R.string.library),
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    } else {
+                        Column {
+                            Text(stringResource(R.string.library))
+                            Text(stringResource(R.string.clip_count, state.stats.activeCount), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                },
                 actions = {
                     BadgedBox(badge = { if (state.stats.trashCount > 0) Badge { Text(state.stats.trashCount.toString()) } }) {
                         IconButton(onClick = onOpenTrash) { Icon(Icons.Default.Delete, stringResource(R.string.trash)) }
@@ -349,11 +388,12 @@ private fun LibraryScreen(
                     IconButton(onClick = onOpenSearch) { Icon(Icons.Default.Tune, stringResource(R.string.advanced_search)) }
                     IconButton(onClick = onLock) { Icon(Icons.Default.Lock, stringResource(R.string.lock)) }
                 }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background))
-            // Short windows (DeX freeform): hidden unless a query is active; Advanced Search stays in the top bar.
+            // Short DeX windows collapse quick search into the top-left icon; Advanced Search remains separate.
             if (showInlineSearch) OutlinedTextField(value = state.query.search, onValueChange = viewModel::setSearch,
                 leadingIcon = { Icon(Icons.Default.Search, null) }, trailingIcon = { if (state.query.search.isNotEmpty()) IconButton(onClick = { viewModel.setSearch("") }) { Icon(Icons.Default.Close, null) } },
                 placeholder = { Text(stringResource(R.string.search_hint)) }, singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).testTag(LIBRARY_INLINE_SEARCH_TAG))
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+                    .focusRequester(searchFocusRequester).testTag(LIBRARY_INLINE_SEARCH_TAG))
             LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 lazyItems(SmartFilter.entries, key = { it.name }) { filter ->
                     FilterChip(selected = state.query.filter == filter && state.query.collectionId == null,
@@ -369,6 +409,7 @@ private fun LibraryScreen(
 }
 
 internal const val LIBRARY_INLINE_SEARCH_TAG = "library_inline_search"
+internal const val LIBRARY_COMPACT_SEARCH_TAG = "library_compact_search"
 
 @Composable
 private fun BulkSelectionBar(
