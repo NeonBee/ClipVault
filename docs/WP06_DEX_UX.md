@@ -110,16 +110,18 @@ powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1
 
 ### 메인 vault 라이브러리
 
-- 라이브러리 화면이 실제로 받는 높이가 **420dp 미만**이면 inline 검색창을 숨긴다. 상단 바, 검색창, 필터 칩이 약 180dp 를 차지하므로, 이 기준 아래에서는 목록 높이가 240dp 미만으로 줄어든다.
-- 검색은 TopAppBar 의 Advanced Search(조정 아이콘)로 계속 할 수 있다. 같은 검색어(`query.search`)를 편집한다.
-- 예외: 검색어가 입력돼 있으면 좁아도 검색창을 유지한다. 필터가 걸린 상태가 보이지 않으면 결과가 왜 줄었는지 알 수 없고 지울 방법도 없기 때문이다.
-- 판정은 `LibraryLayout.showInlineSearch` 한 곳에서 하며, unit test 와 compose test(`LibraryCompactHeightComposeTest`)로 확인한다.
+- 2단계 최초 구현에서는 라이브러리 높이가 **420dp 미만**이면 inline 검색창을 숨기고 Advanced Search만 남겼다.
+- 실기기 확인 후 이 동작은 원래 요구사항과 다르다고 판정했다. 목표는 검색 기능을 Advanced Search로 대체하는 것이 아니라, **빠른 검색창을 compact 상태에서 최상단 좌측 돋보기로 축약하고 필요할 때 다시 펼치는 것**이다.
+- 3단계 보완부터 compact 상태에서는 좌측 검색 affordance를 표시한다. 누르면 inline 검색창이 다시 나타나며 focus를 받는다.
+- 검색어가 있어도 검색창을 강제로 펼치지 않는다. 사용자가 다시 접을 수 있고, 접힌 상태에서는 돋보기 badge로 active query를 표시한다.
+- Advanced Search(조정 아이콘)는 빠른 검색과 별개 기능으로 그대로 유지한다.
+- 판정은 `LibraryLayout.isCompactHeight` / `showInlineSearch`와 compose test(`LibraryCompactHeightComposeTest`)로 확인한다.
 
 ### QuickPaste 최소 창 크기
 
 - manifest `<layout>` 최소 크기를 360×400dp → **280×260dp** 로 줄였다. 기본 크기 560×620dp 는 그대로 둔다. Compose 쪽에는 별도 최소 크기 제약이 없으므로 manifest 값이 유일한 하한이다.
 - 잠금·설정 화면은 상단 여백을 48dp → 16dp 로 줄이고 세로 스크롤을 줘서, 260dp 높이에서도 버튼이 잘리지 않는다.
-- `QuickPasteCompactLayoutTest` 가 280×260dp 에서 다음을 확인한다.
+- `QuickPasteCompactLayoutTest` 가 최소 크기에서 다음을 확인한다(2단계 시점에는 280×260dp, 3단계에서 240×260dp 로 변경).
   - 검색 필드 포커스, 첫 행, 키 안내 표시
   - ↓ 로 보이는 범위 밖의 행을 선택하면 목록이 스크롤됨
   - Enter 복사, Esc 닫기
@@ -131,9 +133,75 @@ powershell -ExecutionPolicy Bypass -File scripts\device-validation-record.ps1
 
 | 확인 | 기대 결과 | 결과 |
 | --- | --- | --- |
-| QuickPaste 창을 가장 작게 줄이기 | 약 280×260dp 에서 멈춤 | PENDING |
-| 최소 크기에서 입력, ↑/↓, Enter | 검색 필드·목록·키 안내가 보이고, 선택 행이 보이는 범위로 스크롤, Enter 로 복사 후 닫힘 | PENDING |
-| 최소 크기에서 Esc | 창 닫힘 | PENDING |
-| 최소 크기에서 잠긴 상태로 열기 | Unlock·Close 버튼 도달 가능 | PENDING |
-| 메인 앱 창 높이를 낮게 줄이기 | inline 검색창이 사라지고 목록이 더 길어짐. 상단 조정 아이콘으로 Advanced Search 진입 가능 | PENDING |
-| 낮은 창에서 Advanced Search 로 검색어 입력 후 돌아오기 | 검색어가 있는 동안 inline 검색창이 다시 보이고 지울 수 있음 | PENDING |
+| QuickPaste 창을 가장 작게 줄이기 | 약 280×260dp 에서 멈춤 | PASS (2026-09-29) |
+| 최소 크기에서 입력, ↑/↓, Enter | 검색 필드·목록·키 안내가 보이고, 선택 행이 보이는 범위로 스크롤, Enter 로 복사 후 닫힘 | PASS (2026-09-29) |
+| 최소 크기에서 Esc | 창 닫힘 | PASS (2026-09-29) |
+| 최소 크기에서 잠긴 상태로 열기 | Unlock·Close 버튼 도달 가능 | PASS (2026-09-29) |
+| 메인 앱 창 높이를 낮게 줄이기 | inline 검색창이 사라지고 목록이 더 길어짐. 상단 조정 아이콘으로 Advanced Search 진입 가능 | PARTIAL (2026-09-29) — 검색창 숨김과 Advanced Search 진입은 확인. 다만 더 줄이면 clip 이 하나도 안 보이고 일부 액션이 잘림 |
+| 낮은 창에서 Advanced Search 로 검색어 입력 후 돌아오기 | 검색어가 있는 동안 inline 검색창이 다시 보이고 지울 수 있음 | PASS (2026-09-29) — 의도대로 유지됨 |
+
+## 3단계 — 최소 사용 가능 viewport
+
+2단계 실기기 관측(PR #13, 2026-09-29)에서 2가지 문제가 확인되었다.
+
+1. MainActivity 에 `<layout>` 이 없어 freeform 창 크기 하한이 전혀 없었다. 창을 계속 줄이면 **필터 칩만 보이고 clip 은 하나도 보이지 않는** 상태까지 허용된다.
+2. 폭이 좁아지면 `LibraryScreen` 의 TopAppBar 액션 4개(Trash·Sort·Advanced Search·Lock)가 title 을 밀어내 잘린다.
+
+두 문제는 성격이 다르다. 1번은 창 자체의 크기 문제이고, 2번은 폭 문제이므로 **높이 하한과 폭 하한을 모두 manifest `<layout>` 로 지정**한다. Compose 레벨에서 최소 레이아웃을 유지하는 대신 창을 아예 줄이지 못하게 하는 이유는, 사용자가 창을 줄였는데 아무 반응이 없는 상태가 더 나쁘기 때문이다.
+
+### 높이 하한 384dp
+
+`LibraryLayout` 의 예산으로 도출한다.
+
+| 구성 요소 | 근거 | dp |
+| --- | --- | --- |
+| TopAppBar | Material 3 small top app bar | 64 |
+| 필터 칩 LazyRow | FilterChip 32 + contentPadding 8×2 | 48 |
+| ClipCard 최소 | padding 16×2 + title 20 + body 1줄 24 + 액션 행 48 + gap 9×2 | 142 |
+| ClipList padding | LazyColumn contentPadding 12×2 | 24 |
+| bottom menu | Material 3 navigation bar | 80 |
+| **합계** | | **358** |
+| **선택한 하한** | 358 + 본문 2줄 card(+24) = 382dp를 넘도록 정렬 | **384** |
+
+이 값은 추정이 아니다. `LibraryLayout.MIN_USABLE_HEIGHT_BUDGET_DP` 로 코드에 고정하고 `LibraryLayoutTest` 가
+"하한 ≥ 예산 + 24dp"를 검사하므로, library 행이 늘어 예산을 넘어가면 테스트가 실패한다.
+manifest 는 Kotlin 상수를 읽을 수 없으므로 **`<layout>` 값이 이 예산과 어긋나면 테스트는 잡아내지 못한다.**
+값을 바꿀 때는 양쪽을 같이 고쳐야 한다.
+
+`COMPACT_HEIGHT_DP = 420`은 inline 빠른 검색을 compact affordance로 접는 기준이다. 즉 384~420dp 구간에서는
+창은 더 줄일 수 없지만 inline 검색창 대신 좌측 돋보기가 기본으로 보이며, 사용자가 누르면 다시 펼칠 수 있다.
+
+### 폭 하한 320dp
+
+일반 높이에서는 TopAppBar 액션 IconButton 4개(48×4 = 192dp) + title 슬롯(112dp) + 여백(16dp) = 320dp 이다.
+compact 높이에서는 좌측 검색 affordance 48dp가 추가되므로 제목을 1줄 `titleMedium`으로 줄여 64dp budget을 사용한다.
+따라서 192 + 48 + 64 + 16 = **320dp**로 같은 폭 하한을 유지한다. 이보다 좁으면 필수 조작이 overflow 될 수 있다.
+
+### QuickPaste 최소 폭 240dp
+
+2단계 관측에서 QuickPaste 최소 크기(280×260dp)는 "보조창으로 써도 충분하다"는 확인을 받았고,
+**가로 폭만** 추가 축소를 원했다. 세로 260dp 는 그대로 둔다.
+
+240dp 에서 content 폭은 208dp 이다.
+
+- `Close` + `Unlock vault` 버튼 합이 약 190dp 로 빡빡하게 들어간다. 잘린 Unlock 버튼은 두 줄로 바꾼
+  것보다 나쁘므로 잠금·설정 화면의 버튼 행을 `Row` 에서 `FlowRow` 로 바꿔 줄바꿈을 허용한다.
+- 키 안내 문구(`"↑↓ select · Enter copy · Esc close"`)가 208dp 에서 2줄로 감긴다. 높이는 LazyColumn 이
+  `weight(1f)` 로 흡수하므로 목록이 한 행 줄어들 뿐 창이 깨지지 않는다.
+
+### 실기기 확인 (SM-S918N, DeX) — 3단계
+
+`adb install -r` 로 덮어 설치한다(삭제 금지).
+
+| 확인 | 기대 결과 | 결과 |
+| --- | --- | --- |
+| 메인 창을 가장 작게 줄이기 | 약 384dp 에서 멈춤 | PASS (2026-09-30) |
+| 최소 크기에서 필터 칩 + clip 1개 + bottom menu | 셋이 동시에 보임 | PASS (2026-09-30) |
+| 최소 크기에서 TopAppBar 액션 4개 | Trash·Sort·Advanced Search·Lock 이 모두 보임 | PASS (2026-09-30) |
+| QuickPaste 창을 가장 작게 줄이기 | 약 240×260dp 에서 멈춤 | PASS (2026-09-30) |
+| QuickPaste 최소 폭에서 잠긴 상태로 열기 | Close·Unlock 이 잘리지 않고 둘 다 보임 또는 줄바꿈 | PASS (2026-09-30) |
+| QuickPaste 최소 폭에서 키 안내 문구 | 잘리지 않고 읽힘(줄바꿈 허용) | PASS (2026-09-30) |
+| compact 진입 시 빠른 검색 | inline 검색창 대신 최상단 좌측 돋보기가 표시됨 | PENDING |
+| compact 돋보기 클릭 | inline 검색창이 펼쳐지고 즉시 focus 됨 | PENDING |
+| 검색어가 있는 상태에서 다시 접기 | 결과/filter는 유지되고 검색창만 접힘; 돋보기에 active badge 표시 | PENDING |
+| 창 높이를 420dp 이상으로 복구 | 일반 inline 검색창이 자동 복귀 | PENDING |
