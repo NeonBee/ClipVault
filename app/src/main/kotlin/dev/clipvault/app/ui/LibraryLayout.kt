@@ -3,8 +3,8 @@ package dev.clipvault.app.ui
 /**
  * Compact-height policy for the library (WP-06 DeX UX). Short freeform windows lose most of their
  * height to the top bar, the inline search field and the filter chips, so below this available
- * height the inline field is hidden; search stays reachable through the top bar's Advanced Search,
- * which edits the same query.
+ * height the inline field collapses into a top-left search affordance. Advanced Search stays
+ * separate and continues to edit the same query.
  */
 internal object LibraryLayout {
     /** Available library height (below the app bar insets, above bottom navigation) in dp. */
@@ -21,7 +21,10 @@ internal object LibraryLayout {
      */
     const val MIN_USABLE_HEIGHT_DP = 384
 
-    /** Four 48dp top bar actions plus a readable title slot; narrower and the actions overflow. */
+    /**
+     * Compact top bar budget: four 48dp actions + 48dp search affordance + 64dp compact title +
+     * 16dp spacing. Wider layouts do not show the compact affordance.
+     */
     const val MIN_USABLE_WIDTH_DP = 320
 
     /** Material 3 small top app bar. */
@@ -42,10 +45,13 @@ internal object LibraryLayout {
     const val MIN_USABLE_HEIGHT_BUDGET_DP =
         TOP_BAR_DP + FILTER_CHIPS_DP + CLIP_CARD_DP + LIST_PADDING_DP + BOTTOM_MENU_DP
 
+    fun isCompactHeight(availableHeightDp: Float): Boolean =
+        availableHeightDp < COMPACT_HEIGHT_DP
+
     /**
-     * An active query keeps the field visible even when short: otherwise a filtered list would show
-     * no sign of the filter and no way to clear it.
+     * Full-height layouts always show quick search. Compact layouts show it only after the user
+     * explicitly expands the top-left search affordance; an active query does not force it open.
      */
-    fun showInlineSearch(availableHeightDp: Float, query: String): Boolean =
-        availableHeightDp >= COMPACT_HEIGHT_DP || query.isNotEmpty()
+    fun showInlineSearch(availableHeightDp: Float, compactSearchExpanded: Boolean): Boolean =
+        !isCompactHeight(availableHeightDp) || compactSearchExpanded
 }
