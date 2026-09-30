@@ -337,6 +337,9 @@ private fun LibraryScreen(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val compactHeight = LibraryLayout.isCompactHeight(maxHeight.value)
         val showInlineSearch = LibraryLayout.showInlineSearch(maxHeight.value, compactSearchExpanded)
+        LaunchedEffect(compactHeight) {
+            if (!compactHeight) compactSearchExpanded = false
+        }
         LaunchedEffect(compactHeight, compactSearchExpanded) {
             if (compactHeight && compactSearchExpanded) searchFocusRequester.requestFocus()
         }
