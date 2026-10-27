@@ -156,6 +156,7 @@ fun QuickPasteScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColumnScope.SearchPane(
     state: QuickPasteState,
