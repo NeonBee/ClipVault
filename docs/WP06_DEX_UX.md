@@ -1,5 +1,7 @@
 # WP-06 DeX UX
 
+> Windows에서 PR #15 실기기 검증 전에 APK를 갱신할 때는 [데이터 보존형 빌드·설치·실행 자동화](DEVICE_DEBUG_DEPLOY.md)의 `scripts/deploy-debug.ps1`을 사용한다. `adb uninstall`이나 실기기 `connectedDebugAndroidTest`는 사용하지 않는다.
+
 용어:
 - `PR #N`은 GitHub Pull Request 번호를 의미한다.
 - `WP-NN`은 설계 Work Package 번호를 의미한다(`DEX_FORK_AUDIT_DESIGN.md` §21 참조).
