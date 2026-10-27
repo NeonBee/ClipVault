@@ -46,6 +46,15 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <!-- Freeform (DeX) window floor only; phones ignore <layout>. Without it the main window
+                 can be resized until the library shows filter chips but no clip, and until the four
+                 top bar actions overflow. The floor is the smallest usable vault viewport: top bar
+                 (64) + filter chips (48) + one clip card (142) + list padding (24) + bottom menu (80)
+                 = 358dp; a two-line body requires +24dp (382dp), so the floor is rounded up to 384dp. The inline search stays
+                 hidden below LibraryLayout.COMPACT_HEIGHT_DP, which is a separate threshold. -->
+            <layout
+                android:minHeight="384dp"
+                android:minWidth="320dp" />
         </activity>
 
         <!-- Unexported: reached only through ClipVault's own launcher shortcut. Separate task, no recents
@@ -61,14 +70,14 @@
             android:taskAffinity="${applicationId}.quickpaste"
             android:windowSoftInputMode="stateVisible|adjustResize">
             <!-- Initial freeform (DeX) window size; phones ignore it and show the window full screen.
-                 The minimum is the only size floor (Compose sets none): 280x260dp still fits the search
+                 The minimum is the only size floor (Compose sets none): 240x260dp still fits the search
                  field, a few rows and the key hint (WP-06, QuickPasteCompactLayoutTest). -->
             <layout
                 android:defaultHeight="620dp"
                 android:defaultWidth="560dp"
                 android:gravity="center"
                 android:minHeight="260dp"
-                android:minWidth="280dp" />
+                android:minWidth="240dp" />
         </activity>
 
         <service

@@ -22,6 +22,8 @@
     <string name="retry">Retry</string>
     <string name="lock">Lock</string>
     <string name="sort">Sort</string>
+    <string name="search">Search</string>
+    <string name="close_search">Close search</string>
     <string name="search_hint">Search text, title, note or domain</string>
     <string name="clip_count">%1$d clips</string>
     <string name="selected_count">%1$d selected</string>

@@ -7,7 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -67,6 +68,7 @@ object QuickPasteTags {
     fun row(index: Int) = "quick_paste_row_$index"
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun QuickPasteScreen(
     state: QuickPasteState,
@@ -122,13 +124,21 @@ fun QuickPasteScreen(
                     }
                     QuickPasteGate.LOCKED -> StatusPane(stringResource(R.string.quick_paste_locked), state.message) {
                         Icon(Icons.Default.Lock, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // FlowRow, not Row: at the 240dp freeform minimum the two buttons no longer fit
+                        // on one line, and a clipped Unlock button is worse than a second line.
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             TextButton(onClick = onClose) { Text(stringResource(R.string.quick_paste_close)) }
                             Button(onClick = onUnlock) { Text(stringResource(R.string.unlock_vault)) }
                         }
                     }
                     QuickPasteGate.SETUP_REQUIRED -> StatusPane(stringResource(R.string.quick_paste_title), state.message) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             TextButton(onClick = onClose) { Text(stringResource(R.string.quick_paste_close)) }
                             Button(onClick = onOpenApp) { Text(stringResource(R.string.quick_paste_open_app)) }
                         }

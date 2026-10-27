@@ -70,4 +70,6 @@
     <string name="unlock_interrupted">خزانه هنگام باز شدن قفل شد. دوباره احراز هویت کنید.</string>
     <string name="recent_locks">قفل‌های اخیر</string>
     <string name="lock_at">قفل %1$s</string>
+    <string name="search">جستجو</string>
+    <string name="close_search">بستن جستجو</string>
 </resources>

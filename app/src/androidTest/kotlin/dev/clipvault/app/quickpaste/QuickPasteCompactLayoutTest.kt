@@ -25,7 +25,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/** WP-06: the QuickPaste freeform minimum is 280x260dp (manifest <layout>); the keyboard flow must still work there. */
+/** WP-06: the QuickPaste freeform minimum is 240x260dp (manifest <layout>); the keyboard flow must still work there. */
 @OptIn(ExperimentalTestApi::class)
 class QuickPasteCompactLayoutTest {
     @get:Rule val compose = createComposeRule()
@@ -38,7 +38,7 @@ class QuickPasteCompactLayoutTest {
     private fun showAtMinimumSize(initial: QuickPasteState) {
         state = initial
         compose.setContent {
-            Box(Modifier.size(width = 280.dp, height = 260.dp)) {
+            Box(Modifier.size(width = 240.dp, height = 260.dp)) {
                 QuickPasteScreen(
                     state = state,
                     onQueryChange = { state = state.copy(query = it) },
