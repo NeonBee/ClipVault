@@ -203,7 +203,14 @@ compact 높이에서는 좌측 검색 affordance 48dp가 추가되므로 제목�
 | QuickPaste 창을 가장 작게 줄이기 | 약 240×260dp 에서 멈춤 | PASS (2026-09-30) |
 | QuickPaste 최소 폭에서 잠긴 상태로 열기 | Close·Unlock 이 잘리지 않고 둘 다 보임 또는 줄바꿈 | PASS (2026-09-30) |
 | QuickPaste 최소 폭에서 키 안내 문구 | 잘리지 않고 읽힘(줄바꿈 허용) | PASS (2026-09-30) |
-| compact 진입 시 빠른 검색 | inline 검색창 대신 최상단 좌측 돋보기가 표시됨 | PENDING |
-| compact 돋보기 클릭 | inline 검색창이 펼쳐지고 즉시 focus 됨 | PENDING |
-| 검색어가 있는 상태에서 다시 접기 | 결과/filter는 유지되고 검색창만 접힘; 돋보기에 active badge 표시 | PENDING |
-| 창 높이를 420dp 이상으로 복구 | 일반 inline 검색창이 자동 복귀 | PENDING |
+| compact 진입 시 빠른 검색 | inline 검색창 대신 최상단 좌측 돋보기가 표시됨 | PASS (2026-10-27, 실기기 확인) |
+| compact 돋보기 클릭 | inline 검색창이 펼쳐지고 즉시 focus 됨 | PASS (2026-10-27, 실기기 확인) |
+| 검색어가 있는 상태에서 다시 접기 | 결과/filter는 유지되고 검색창만 접힘; 돋보기에 active badge 표시 | PASS (2026-10-27, 실기기 확인) |
+| 창 높이를 420dp 이상으로 복구 | 일반 inline 검색창이 자동 복귀 | PASS (2026-10-27, 실기기 확인) |
+
+### PR #15 최종 실기기 검증 기록 (2026-10-27)
+
+- Windows에서 `scripts/deploy-debug.ps1`로 최신 PR #15 debug APK를 빌드·기존 앱 데이터 보존 방식으로 설치하고, 실행 및 변경사항 반영을 확인했다.
+- Samsung DeX의 compact 빠른 검색 UX 4개 항목은 사용자 실기기 검증 결과 모두 PASS.
+- GitHub Android CI run #43 (`92f1665aa0b529b371e8d42c26acb54fb7bf328e`)는 verify/instrumentation 모두 성공했고, PowerShell 스크립트 구문 검사도 PASS했다.
+- 이 검증은 WP-06 3단계 UX 범위에 대한 것이며, 본 문서 1단계의 세션 재인증 원인 분석 등 별도 과제를 자동으로 해결했다는 의미는 아니다.
