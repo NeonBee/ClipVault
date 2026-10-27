@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -65,6 +66,7 @@ object QuickPasteTags {
     const val ROOT = "quick_paste_root"
     const val SEARCH = "quick_paste_search"
     const val LIST = "quick_paste_list"
+    const val KEEP_OPEN = "quick_paste_keep_open"
     fun row(index: Int) = "quick_paste_row_$index"
 }
 
@@ -79,6 +81,8 @@ fun QuickPasteScreen(
     onClose: () -> Unit,
     onUnlock: () -> Unit,
     onOpenApp: () -> Unit,
+    keepOpenAfterCopy: Boolean,
+    onKeepOpenChange: (Boolean) -> Unit,
 ) {
     // The root is focusable so Esc (and Enter on the lock pane) reach the key handler even when no
     // field or button holds focus; clickable buttons are not focusable in touch mode.
@@ -118,7 +122,10 @@ fun QuickPasteScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 when (state.gate) {
-                    QuickPasteGate.READY -> SearchPane(state, onQueryChange, onSelectIndex, onConfirm)
+                    QuickPasteGate.READY -> SearchPane(
+                        state, onQueryChange, onSelectIndex, onConfirm,
+                        keepOpenAfterCopy, onKeepOpenChange,
+                    )
                     QuickPasteGate.UNLOCKING -> StatusPane(stringResource(R.string.quick_paste_unlocking), null) {
                         CircularProgressIndicator(Modifier.size(32.dp))
                     }
@@ -155,6 +162,8 @@ private fun ColumnScope.SearchPane(
     onQueryChange: (String) -> Unit,
     onSelectIndex: (Int) -> Unit,
     onConfirm: () -> Unit,
+    keepOpenAfterCopy: Boolean,
+    onKeepOpenChange: (Boolean) -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -193,8 +202,21 @@ private fun ColumnScope.SearchPane(
             }
         }
     }
-    Text(stringResource(R.string.quick_paste_keys_hint), style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // Keep the option next to the existing keyboard hint so the 240x260dp DeX window can
+    // wrap them independently. This controls copy-close only, NOT window z-order/topmost.
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(stringResource(R.string.quick_paste_keys_hint),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FilterChip(
+            selected = keepOpenAfterCopy,
+            onClick = { onKeepOpenChange(!keepOpenAfterCopy) },
+            label = { Text(stringResource(R.string.quick_paste_keep_open)) },
+            modifier = Modifier.testTag(QuickPasteTags.KEEP_OPEN),
+        )
+    }
 }
 
 @Composable
