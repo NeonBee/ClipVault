@@ -333,15 +333,15 @@ window policy may still override the geometry even for a retained task, so
 
 ### Safe device acceptance test (PENDING)
 
-- [ ] W01: Open via physical hotkey with opt-in alias ON, then shrink
+- [x] W01: Open via physical hotkey with opt-in alias ON, then shrink
   QuickPaste to a narrow, short panel and move it aside.
-- [ ] W02: Press the DeX window's **minimize** control (not Esc or Close),
+- [x] W02: Press the DeX window's **minimize** control (not Esc or Close),
   then call the *same* Samsung shortcut. Does the **same size and location**
   return, rather than the vertically extended default?
 - [ ] W03: Repeat W02 three times, including when another app's input has
   focus. Query should be blank on reentry; no previous result list remains
   visible without an unlocked vault.
-- [ ] W04: With the vault LOCKED/background auto-lock elapsed, hotkey
+- [x] W04: With the vault LOCKED/background auto-lock elapsed, hotkey
   reopening must require strong biometrics and show **no cached clip content**
   until the vault is unlocked.
 - [ ] W05: With the panel open, press **Esc** or copy and close; relaunch
@@ -364,3 +364,14 @@ state alive. The ViewModel's `clear()` cancels searches and replaces results
 with the LOCKED state during `onStop`; it re-queries only if the shared vault
 is still unlocked on foreground return. The app-wide background auto-lock and
 screen-off locks remain in force.
+
+### DeX minimize + hotkey retest — PASS on target device (2026-10-28)
+
+User tested the WP-06S change after installing the new APK and reports:
+- **W01/W02: PASS (user observed)** — the manually resized QuickPaste panel now **retains the adjusted DeX window size** on minimize and hotkey re-entry, rather than expanding to the tall default.
+- **W04: PASS (user observed)** — the hotkey/minimize flow did **not bypass the vault authentication gate**. No bypass was observed on the device. The report does not independently verify process death, reboot persistence, or every timing edge case.
+- **W03/W05/W06: still PENDING** — precise three-cycle/focus checks, explicit Esc-close geometry, and multi-window instance count were not reported. Windows remote-control Ctrl/Cmd compatibility (R03) remains PENDING.
+
+The implementation retains the DeX task in `QuickPasteActivity.onStop()` but immediately drops its in-memory search query and decrypted results, while explicit close/copy continues to finish. **Do not persist clip contents to save window state.**
+
+**CI follow-up:** Android Actions run **#58** for commit `98c2a60`: `verify` PASS, `instrumentation` FAIL because the old test `QuickPasteActivityInstrumentedTest.leavingTheWindowFinishesIt` still asserted `DESTROYED` after `onStop`. That assertion conflicts with the new intentional task-preservation policy (the actual lifecycle reached `CREATED`). Commit `b298f56` replaces it with a test for `CREATED` and wiped search results/query while locked. A later CI run must pass before merging; this is **test expectation drift**, not evidence of a biometric bypass.
