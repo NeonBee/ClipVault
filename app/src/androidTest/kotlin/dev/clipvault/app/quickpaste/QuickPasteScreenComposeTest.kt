@@ -42,6 +42,7 @@ class QuickPasteScreenComposeTest {
     private var closed = 0
     private var unlocks = 0
     private var openApp = 0
+    private var keepOpenAfterCopy by mutableStateOf(false)
 
     private var inputModeManager: InputModeManager? = null
 
@@ -58,6 +59,8 @@ class QuickPasteScreenComposeTest {
                 onClose = { closed++ },
                 onUnlock = { unlocks++ },
                 onOpenApp = { openApp++ },
+                keepOpenAfterCopy = keepOpenAfterCopy,
+                onKeepOpenChange = { keepOpenAfterCopy = it },
             )
         }
     }
