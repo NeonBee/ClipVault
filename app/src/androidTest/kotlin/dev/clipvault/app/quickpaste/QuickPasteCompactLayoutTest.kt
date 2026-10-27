@@ -34,6 +34,7 @@ class QuickPasteCompactLayoutTest {
     private var confirmed: ClipItem? = null
     private var closed = 0
     private var unlocks = 0
+    private var keepOpenAfterCopy by mutableStateOf(false)
 
     private fun showAtMinimumSize(initial: QuickPasteState) {
         state = initial
@@ -48,6 +49,8 @@ class QuickPasteCompactLayoutTest {
                     onClose = { closed++ },
                     onUnlock = { unlocks++ },
                     onOpenApp = {},
+                    keepOpenAfterCopy = keepOpenAfterCopy,
+                    onKeepOpenChange = { keepOpenAfterCopy = it },
                 )
             }
         }
@@ -71,6 +74,16 @@ class QuickPasteCompactLayoutTest {
         assertEquals(5L, confirmed?.id)
         search.performKeyInput { pressKey(Key.Escape) }
         assertEquals(1, closed)
+    }
+
+    @Test fun keepOpenSettingTogglesWithinTheMinimumWindow() {
+        keepOpenAfterCopy = false
+        showAtMinimumSize(QuickPasteState(gate = QuickPasteGate.READY, searched = true))
+        compose.onNodeWithTag(QuickPasteTags.KEEP_OPEN).assertIsDisplayed()
+        compose.onNodeWithTag(QuickPasteTags.KEEP_OPEN).performClick()
+        compose.runOnIdle { assertEquals(true, keepOpenAfterCopy) }
+        compose.onNodeWithTag(QuickPasteTags.KEEP_OPEN).performClick()
+        compose.runOnIdle { assertEquals(false, keepOpenAfterCopy) }
     }
 
     @Test fun lockPaneButtonsStayReachableAtTheMinimumHeight() {
