@@ -106,9 +106,9 @@ instrumentation on a disposable emulator.
 | Case | Expected | Status |
 | --- | --- | --- |
 | A01 | Alias OFF after clean install | CI test; device PENDING |
-| A02 | Opt-in ON creates secondary launcher icon | PENDING |
-| A03 | Samsung picker sees secondary entry separately | PENDING |
-| A04 | Chrome focused → physical hotkey opens QuickPaste | PENDING |
+| A02 | Opt-in ON creates secondary launcher icon | **PASS** — user tested on S23 Ultra / DeX |
+| A03 | Samsung picker sees secondary entry separately | **FAIL** — selecting Quick paste registers ClipVault (Main) |
+| A04 | Chrome focused → physical hotkey opens QuickPaste | **FAIL for direct QuickPaste launch** — hotkey opens Main; specific prior app focus not verified |
 | A05 | Locked vault still requires biometrics | PENDING |
 | A06 | Esc/focus and double-invocation safe | PENDING |
 | A07 | Opt-out removes alias, original shortcut unaffected | PENDING |
@@ -132,7 +132,9 @@ References:
 User report from One UI 8.0 / Samsung DeX:
 - The optional **ClipVault Quick paste** launcher icon **does appear** after enabling it (A02 PASS).
 - Selecting that icon in **키 직접 설정 → 앱 단축키** registers **ClipVault**, and triggering the bound key **opens Main Vault**, not QuickPaste (A03/A04 FAIL for this build).
-- It is NOT yet established whether directly **tapping the second launcher icon** opens QuickPaste. This is the necessary discriminating check before modifying app code.
+- **D01 PASS:** the user directly tapped the separate **ClipVault Quick paste** icon and the intended QuickPaste opened normally.
+- **D02 PASS:** explicit `adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n dev.clipvault.app.debug/dev.clipvault.app.quickpaste.QuickPasteLauncherAlias` also opened QuickPaste normally.
+- Therefore the alias target/registration and local launch routing work; Samsung's key-to-app selection or launch resolution is the leading failure boundary, not an app-level QuickPaste target crash.
 
 ### Root cause hypothesis (not yet independently verified)
 
@@ -154,4 +156,12 @@ This does NOT uninstall, clear, or rewrite the vault. On non-debug builds substi
 
 **Do not** reorder/remove the normal Main Vault launcher to trick an ambiguous package-based resolver; that would break default app launching. **Do not** make Ctrl/Cmd exchange mandatory: Windows remote-control compatibility remains an independent blocker R03. A second package/companion APK would be a distinct security architecture with IPC and signing considerations, not an automatic follow-on fix.
 
-A CI note: Android CI run #46 `instrumentation` succeeded, but `verify` failed on six new `MissingTranslation` lint findings in `values-fa`. The translations were added in a follow-up commit; run #46 does not establish a complete CI pass.
+CI history: Android run #46 `instrumentation` PASS / `verify` FAIL on six Persian `MissingTranslation` findings. Translation fix commit `254bf91` followed; subsequent **run #48 SUCCESS** for head `38d2bb3` (before this documentation-only status update).
+
+### Follow-up triage — D01/D02 PASS, DeX key mapping still routes to Main (2026-10-27)
+
+**Evidence**: On the S23 Ultra / DeX, (1) direct tap on `ClipVault Quick paste` opened QuickPaste; (2) explicit adb launch of `dev.clipvault.app.quickpaste.QuickPasteLauncherAlias` opened QuickPaste. Selecting it under Samsung `키 직접 설정 → 앱 단축키` nonetheless records the regular ClipVault app and its hotkey opens Main Vault.
+
+**Conclusion / boundary**: Alias registration, exported entry access, and target activity dispatch have passed both direct-launch checks. The observed remaining problem lies along Samsung's *app-shortcut picker → saved selection → hotkey execution* path. The hypothesis that One UI resolves by *package default launcher* rather than the selected alias component is plausible, **not verified from Samsung implementation source**. Do not mark a `same-package app hotkey to QuickPaste` as supported.
+
+**Next decision**: Keep the alias PoC as Draft and **do not merge as a working global-hotkey feature**. Options requiring separate exploration: (A) preserve one APK and offer a configurable default-entry behavior only with explicit user impact review (it may break normal ClipVault opening); (B) design a separate-package companion launcher with authenticated IPC and minimized exposure, only if worth the extra package/security/maintenance cost; (C) use notification QuickPaste action / existing long-press shortcut as low-risk fallbacks. Any Ctrl/Cmd remapping must also pass remote Windows use (R03) before recommendation.
