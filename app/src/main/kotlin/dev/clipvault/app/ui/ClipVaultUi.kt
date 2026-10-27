@@ -160,6 +160,7 @@ import dev.clipvault.app.data.ClipQuery
 import dev.clipvault.app.data.CollectionRecord
 import dev.clipvault.app.data.RetentionPolicy
 import dev.clipvault.app.nativecore.NativeClassifier
+import dev.clipvault.app.quickpaste.QuickPasteLauncherEntry
 import dev.clipvault.app.ui.settings.AccentPalette
 import dev.clipvault.app.ui.settings.AppLanguage
 import dev.clipvault.app.ui.settings.ThemeMode
@@ -691,6 +692,10 @@ private fun SettingsScreen(
 ) {
     var addRule by rememberSaveable { mutableStateOf(false) }
     var customRetention by rememberSaveable { mutableStateOf(false) }
+    val appContext = LocalContext.current.applicationContext
+    var quickPasteLauncherEnabled by remember {
+        mutableStateOf(QuickPasteLauncherEntry.isEnabled(appContext))
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         TopAppBar(title = { Text(stringResource(R.string.settings)) })
         SettingsSection(stringResource(R.string.capture), Icons.Default.PlayCircle) {
@@ -707,6 +712,22 @@ private fun SettingsScreen(
                     FilterChip(state.autoLockMs == value, { viewModel.setAutoLockMs(value) }, { Text(stringResource(label)) })
                 }
             }
+        }
+        SettingsSection(stringResource(R.string.quick_paste_launcher_section), Icons.Default.Search) {
+            SwitchRow(
+                stringResource(R.string.quick_paste_launcher_toggle),
+                stringResource(R.string.quick_paste_launcher_summary),
+                quickPasteLauncherEnabled,
+            ) { enabled ->
+                runCatching { QuickPasteLauncherEntry.setEnabled(appContext, enabled) }
+                    .onSuccess { quickPasteLauncherEnabled = QuickPasteLauncherEntry.isEnabled(appContext) }
+                    .onFailure { viewModel.setError(appContext.getString(R.string.quick_paste_launcher_error)) }
+            }
+            Text(
+                stringResource(R.string.quick_paste_launcher_warning),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         SettingsSection(stringResource(R.string.retention), Icons.Default.Backup) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
