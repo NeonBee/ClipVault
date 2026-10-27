@@ -50,6 +50,8 @@ public final class ClipVaultApp extends Application {
     public static final String PREF_RETENTION_MONTHS = "retention_months";
     public static final String PREF_SKIP_SENSITIVE = "skip_sensitive";
     public static final String PREF_CAPTURE_ENABLED = "capture_enabled";
+    /** User opt-in: copy from QuickPaste without automatically closing its DeX window. */
+    public static final String PREF_QUICK_PASTE_KEEP_OPEN = "quick_paste_keep_open";
     public static final String PREF_ONBOARDED = "onboarded";
     public static final String PREF_CUSTOM_RETENTION_DAYS = "custom_retention_days";
     public static final String PREF_MAINTENANCE_PENDING = "maintenance_pending";
