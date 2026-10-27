@@ -107,8 +107,8 @@ instrumentation on a disposable emulator.
 | --- | --- | --- |
 | A01 | Alias OFF after clean install | CI test; device PENDING |
 | A02 | Opt-in ON creates secondary launcher icon | **PASS** — user tested on S23 Ultra / DeX |
-| A03 | Samsung picker sees secondary entry separately | **FAIL** — selecting Quick paste registers ClipVault (Main) |
-| A04 | Chrome focused → physical hotkey opens QuickPaste | **FAIL for direct QuickPaste launch** — hotkey opens Main; specific prior app focus not verified |
+| A03 | Samsung picker distinguishes the QuickPaste launch target | **PASS for outcome with INFO filter** — user reports shortcut now opens QuickPaste; the exact picker label after remapping was not separately reported |
+| A04 | Hardware hotkey opens QuickPaste | **PASS for user-observed shortcut invocation with INFO filter**; Chrome-specific focus test not separately reported |
 | A05 | Locked vault still requires biometrics | PENDING |
 | A06 | Esc/focus and double-invocation safe | PENDING |
 | A07 | Opt-out removes alias, original shortcut unaffected | PENDING |
@@ -169,7 +169,7 @@ CI history: Android run #46 `instrumentation` PASS / `verify` FAIL on six Persia
 
 ## CATEGORY_INFO priority experiment (PR #16 follow-up, 2026-10-28)
 
-**Status: CODE IMPLEMENTED / CI and One UI device outcome pending. Not a guaranteed shortcut fix.**
+**Status: CODE IMPLEMENTED / CI run #55 PASS / S23 Ultra + One UI 8 DeX field test PASS (2026-10-28). Wider-device compatibility, lock-state and remote Windows modifiers remain pending.**
 
 The Android SDK documents that `PackageManager.getLaunchIntentForPackage(packageName)`
 finds the first matching `ACTION_MAIN + CATEGORY_INFO` entry, then searches
@@ -257,3 +257,45 @@ itself and does NOT prove Samsung app hotkey routing.
 
 Official API:
 https://developer.android.com/reference/android/content/pm/PackageManager#getLaunchIntentForPackage(java.lang.String)
+
+
+### CATEGORY_INFO real-device result — PASS (2026-10-28)
+
+**User-confirmed on Galaxy S23 Ultra / One UI 8 / DeX:**
+- With the optional QuickPaste launcher switch **ON**, tapping the existing
+  ClipVault Main icon still opens **Main Vault**.
+- Samsung's configured physical-keyboard **app hotkey opens QuickPaste**, as
+  intended; the earlier behavior of opening Main is resolved on this device.
+- Turning the option **OFF and back ON** preserves the expected behavior.
+- The user's tested **ordinary Open app actions remain unchanged**. This is a
+  valuable compatibility observation, *not* proof that every possible Android
+  caller of `PackageManager.getLaunchIntentForPackage()` behaves identically.
+
+**Automated verification:** GitHub Actions **run #55 SUCCESS** (`verify` and
+`instrumentation` both passed) on commit `c177474`, before this
+documentation-only record.
+
+**Scope of success:** A single APK plus opt-in `CATEGORY_INFO` launcher
+alias is sufficient for the observed Samsung DeX keyboard-to-QuickPaste UX.
+Do not pursue a companion APK merely to address the resolved routing symptom.
+
+**Remaining release gates (not claimed PASS):**
+- With the vault **LOCKED**, ensure QuickPaste keeps strong biometric
+  authentication and never displays/copies protected content early.
+- Repeated hotkey invocations, Esc close, focus return to the previous app,
+  and operation after reboot/keyboard reconnect.
+- Windows **remote-control** with the user's physical Ctrl/Cmd mapping;
+  verify Ctrl+C, Ctrl+V, Ctrl+Tab, Alt+Tab and Win/Meta key behavior.
+- Cross-version/model One UI compatibility; Samsung's internal app-shortcut
+  implementation is still not independently identified.
+
+**Security boundaries unchanged:** `QuickPasteActivity` remains
+`exported=false`, the optional alias is public only when enabled,
+`FLAG_SECURE` and biometric vault unlocking remain in place, and no
+AccessibilityService, root, network access or key logging was introduced.
+
+**Design consequence:** Continue PR #16 review as a successful device PoC,
+not a universal Android global-hotkey API. Keep it Draft until the remaining
+security and remote-control compatibility gates are reviewed. To undo the
+experiment safely, switch the optional entry OFF without uninstalling or
+resetting vault data.
