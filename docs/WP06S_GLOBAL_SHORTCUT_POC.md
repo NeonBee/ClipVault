@@ -171,29 +171,29 @@ CI history: Android run #46 `instrumentation` PASS / `verify` FAIL on six Persia
 
 **Status: CODE IMPLEMENTED / CI and One UI device outcome pending. Not a guaranteed shortcut fix.**
 
-The Android SDK documents that \`PackageManager.getLaunchIntentForPackage(packageName)\`
-finds the first matching \`ACTION_MAIN + CATEGORY_INFO\` entry, then searches
-\`ACTION_MAIN + CATEGORY_LAUNCHER\`. This does **not** establish what One UI
-actually calls for its \`키 직접 설정 → 앱 단축키\` feature.
+The Android SDK documents that `PackageManager.getLaunchIntentForPackage(packageName)`
+finds the first matching `ACTION_MAIN + CATEGORY_INFO` entry, then searches
+`ACTION_MAIN + CATEGORY_LAUNCHER`. This does **not** establish what One UI
+actually calls for its `키 직접 설정 → 앱 단축키` feature.
 
-Implementation: the opt-in \`QuickPasteLauncherAlias\` now has two **separate**
-\`MAIN\` intent filters:
-- \`CATEGORY_LAUNCHER\`: the existing dedicated icon and direct launch path.
-- \`CATEGORY_INFO\`: experimental front-door priority for *package-based*
-  \`getLaunchIntentForPackage\` callers.
+Implementation: the opt-in `QuickPasteLauncherAlias` now has two **separate**
+`MAIN` intent filters:
+- `CATEGORY_LAUNCHER`: the existing dedicated icon and direct launch path.
+- `CATEGORY_INFO`: experimental front-door priority for *package-based*
+  `getLaunchIntentForPackage` callers.
 
-The MainActivity \`MAIN/LAUNCHER\` filter is unchanged, as is the
-\`QuickPasteActivity\` \`exported=false\` property. The alias stays manifest
-\`enabled=false\` unless the user turns on **Settings → DeX / hardware keyboard →
+The MainActivity `MAIN/LAUNCHER` filter is unchanged, as is the
+`QuickPasteActivity` `exported=false` property. The alias stays manifest
+`enabled=false` unless the user turns on **Settings → DeX / hardware keyboard →
 Show separate Quick paste app icon**. A matching Android instrumentation test
-asserts \`getLaunchIntentForPackage()\` resolves Main when the alias is OFF,
+asserts `getLaunchIntentForPackage()` resolves Main when the alias is OFF,
 QuickPaste alias when ON, and Main again after OFF.
 
 ### Why this is risky (read before testing)
 
-Using \`CATEGORY_INFO\` as a quick-search route is a **nonstandard workaround**:
+Using `CATEGORY_INFO` as a quick-search route is a **nonstandard workaround**:
 this category normally represents the application's information/front-door entry.
-If the OS or another app uses the \`getLaunchIntentForPackage()\` algorithm,
+If the OS or another app uses the `getLaunchIntentForPackage()` algorithm,
 its generic **Open app** command may now open **QuickPaste instead of Main Vault**
 whenever this toggle is ON, even though the original home-screen Main launcher
 icon continues to target Main explicitly.
@@ -206,7 +206,7 @@ compatibility risk.
 ### Real-device validation, no reset/reinstall
 
 1. Get the newest PR #16 branch and run
-   \`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-debug.ps1\`
+   `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-debug.ps1`
    as in the previous section. Keep the SAME local debug signing environment
    to preserve Vault/Keystore data.
 2. Leave the **Show separate Quick paste app icon** switch **OFF**:
@@ -214,12 +214,12 @@ compatibility risk.
    still works.
 3. Switch **ON**. The second icon should still open QuickPaste when tapped.
    The original ClipVault Main icon should still open Main Vault when tapped.
-4. In **키 직접 설정 → 앱 단축키**, remove the previous \`Cmd+P → ClipVault\`
+4. In **키 직접 설정 → 앱 단축키**, remove the previous `Cmd+P → ClipVault`
    entry and **reselect** ClipVault Quick paste, rather than assuming the
    old OS shortcut cached target was updated. Test the physical hotkey while
    Chrome is foregrounded.
-5. Record whether Samsung's picker displays \`ClipVault\` or
-   \`ClipVault Quick paste\`, and whether the hotkey opens Main or QuickPaste.
+5. Record whether Samsung's picker displays `ClipVault` or
+   `ClipVault Quick paste`, and whether the hotkey opens Main or QuickPaste.
 6. Test an ordinary package-based **Open** action from Android settings /
    an app-info screen if it offers such an action. Record whether it opens
    QuickPaste (side effect) or Main. Do not confuse the explicit Main launcher
@@ -232,15 +232,15 @@ compatibility risk.
 
 Useful read-only checks on a debug installation with alias enabled:
 
-\`\`\`powershell
-adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.INFO dev.clipvault.app.debug
-adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER dev.clipvault.app.debug
-\`\`\`
+```powershell
+adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.INFO -p dev.clipvault.app.debug
+adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p dev.clipvault.app.debug
+```
 
-For proof of \`getLaunchIntentForPackage()\` precedence, prefer the
-instrumentation test: the \`cmd package resolve-activity\` shell command is
+For proof of `getLaunchIntentForPackage()` precedence, prefer the
+instrumentation test: the `cmd package resolve-activity` shell command is
 not guaranteed to implement the exact same package-launch algorithm. An
-explicit \`am start -n ...QuickPasteLauncherAlias\` only checks the alias
+explicit `am start -n ...QuickPasteLauncherAlias` only checks the alias
 itself and does NOT prove Samsung app hotkey routing.
 
 ### Decision criteria
