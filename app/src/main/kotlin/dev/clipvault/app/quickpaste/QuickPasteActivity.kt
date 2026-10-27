@@ -95,8 +95,16 @@ class QuickPasteActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Leaving the window (minimise, switch task, screen off) ends the session so nothing lingers.
-        if (!isChangingConfigurations && !authenticating) close()
+        // DeX may minimize QuickPaste before the system shortcut brings it back. Finishing the
+        // task here discards the user's freeform window bounds, so let Android retain the task.
+        // Never retain decrypted search results or a query while the window is hidden.
+        // Esc, explicit Close, Enter/copy and Open ClipVault still call close(), removing the task.
+        if (!isChangingConfigurations && !authenticating && !isFinishing) {
+            viewModel.clear()
+            // If the vault locks while minimized, the next explicit launch must request
+            // biometrics again rather than leaving a stale LOCKED screen with no auto-prompt.
+            viewModel.autoPromptConsumed = false
+        }
     }
 
     override fun onDestroy() {
