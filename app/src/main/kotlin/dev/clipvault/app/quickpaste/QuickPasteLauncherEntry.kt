@@ -15,10 +15,16 @@ import android.content.pm.PackageManager
  * The user can disable the extra launcher entry at any time in ClipVault Settings.
  */
 object QuickPasteLauncherEntry {
-    private const val ALIAS_SUFFIX = ".quickpaste.QuickPasteLauncherAlias"
+    // The component CLASS belongs to the source namespace, not the debug applicationId.
+    // Debug APKs install as dev.clipvault.app.debug, but Activity classes keep
+    // dev.clipvault.app.quickpaste.*; deriving the alias from packageName would be wrong.
+    private const val ALIAS_SIMPLE_NAME = "QuickPasteLauncherAlias"
 
     fun component(context: Context): ComponentName =
-        ComponentName(context.packageName, context.packageName + ALIAS_SUFFIX)
+        ComponentName(
+            context.packageName,
+            QuickPasteActivity::class.java.name.substringBeforeLast('.') + "." + ALIAS_SIMPLE_NAME,
+        )
 
     /** Default (manifest) state is disabled; only explicit opt-in enables the alias. */
     fun isEnabled(context: Context): Boolean =
