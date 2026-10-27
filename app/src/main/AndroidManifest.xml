@@ -95,6 +95,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Experimental WP-06S route: PackageManager.getLaunchIntentForPackage()
+                 resolves MAIN/INFO before MAIN/LAUNCHER. One UI may not use that API.
+                 This filter only affects the already opt-in launcher alias; its manifest
+                 default remains disabled. Package-level "Open app" may now show QuickPaste
+                 while enabled, so this is not intended for release without device checks. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.INFO" />
+            </intent-filter>
         </activity-alias>
 
         <service
