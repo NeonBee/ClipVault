@@ -126,3 +126,32 @@ References:
 - Android: https://developer.android.com/guide/topics/manifest/activity-alias-element
 - Android: https://developer.android.com/reference/android/content/pm/PackageManager
 - `docs/WP06_DEX_UX.md` and `docs/WP07_SECURE_TEXT_BOUNDARY.md`
+
+## Samsung S03 field observation — 2026-10-27 (separate icon visible; hotkey launches Main)
+
+User report from One UI 8.0 / Samsung DeX:
+- The optional **ClipVault Quick paste** launcher icon **does appear** after enabling it (A02 PASS).
+- Selecting that icon in **키 직접 설정 → 앱 단축키** registers **ClipVault**, and triggering the bound key **opens Main Vault**, not QuickPaste (A03/A04 FAIL for this build).
+- It is NOT yet established whether directly **tapping the second launcher icon** opens QuickPaste. This is the necessary discriminating check before modifying app code.
+
+### Root cause hypothesis (not yet independently verified)
+
+The alias is a distinct **launcher component inside the SAME application package**. Samsung's app-shortcut UI might store only the chosen **package name**, or may canonicalize the selection to that package's default `MAIN/LAUNCHER` entry. If the user selects the second icon but the OS ultimately launches `dev.clipvault.app.MainActivity`, this cannot be fixed by changing the alias label, icon or its taskAffinity. Android's `PackageManager.getLaunchIntentForPackage(packageName)` API, if used by the OEM, explicitly returns a front-door activity for the *package*, not an arbitrary selected shortcut component. This particular Samsung implementation has NOT been source-confirmed: hypothesis only.
+
+### Two controlled, data-safe tests
+
+**Test D01 — tap the secondary launcher icon directly.**
+If it opens the QuickPaste search window (instead of Main Vault), the alias target is functioning; Samsung's **app shortcut mapping**, not ClipVault's launcher alias routing, is the likely fault.
+
+**Test D02 — explicit alias launch over ADB** (ensure Settings opt-in is ON):
+
+```powershell
+adb devices
+adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n dev.clipvault.app.debug/dev.clipvault.app.quickpaste.QuickPasteLauncherAlias
+```
+
+This does NOT uninstall, clear, or rewrite the vault. On non-debug builds substitute the actually installed package name. If D02 opens QuickPaste correctly while the Samsung bound key opens Main, record A03/A04 as **Samsung component-collapsing/launch-routing limitation**. If D01/D02 also launch Main or fail, inspect the final merged manifest and alias target in the installed APK before changing the architecture.
+
+**Do not** reorder/remove the normal Main Vault launcher to trick an ambiguous package-based resolver; that would break default app launching. **Do not** make Ctrl/Cmd exchange mandatory: Windows remote-control compatibility remains an independent blocker R03. A second package/companion APK would be a distinct security architecture with IPC and signing considerations, not an automatic follow-on fix.
+
+A CI note: Android CI run #46 `instrumentation` succeeded, but `verify` failed on six new `MissingTranslation` lint findings in `values-fa`. The translations were added in a follow-up commit; run #46 does not establish a complete CI pass.
