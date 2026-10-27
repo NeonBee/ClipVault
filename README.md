@@ -64,6 +64,14 @@ Linux/macOS:
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Release signing keys must be configured outside the repository; no keystore or signing secret belongs in source control.
 
+For repeated Windows real-device / Samsung DeX checks, use the data-preserving one-command deploy script:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-debug.ps1
+```
+
+It builds incrementally, installs with `adb install -r`, and opens Main Vault. `-SkipBuild` reuses the existing APK; `-LaunchOnly` opens the already installed app. **Do not run `connectedDebugAndroidTest` against your personal vault device** (the Gradle task can uninstall the app). See [Windows device validation / debug deployment](docs/DEVICE_DEBUG_DEPLOY.md) for setup, signing-key cautions and the compact-search checklist.
+
 ## Device setup
 
 1. Enroll a strong fingerprint or other `BIOMETRIC_STRONG` credential.
