@@ -299,3 +299,68 @@ not a universal Android global-hotkey API. Keep it Draft until the remaining
 security and remote-control compatibility gates are reviewed. To undo the
 experiment safely, switch the optional entry OFF without uninstalling or
 resetting vault data.
+
+## DeX resized QuickPaste window resets after minimize + shortcut (2026-10-28)
+
+**Device observation (S23 Ultra / One UI 8 / DeX):** After narrowing and positioning
+QuickPaste as a small companion window, minimizing and invoking Samsung's
+working keyboard shortcut returned a **tall default window** rather than the
+user-adjusted dimensions. This is separate from the resolved CATEGORY_INFO
+routing: the correct QuickPaste Activity does open.
+
+### Grounded cause and first fix
+
+1. Previous `QuickPasteActivity.onStop()` called `close()`, which invokes
+   `finishAndRemoveTask()` on ordinary task switch/minimize. That intentionally
+   destroyed the very freeform task that could have held the custom bounds.
+2. **Samsung's official One UI 8 DeX FAQ** says that reopened apps reset their
+   previous window size and position to defaults. This OS behavior must not
+   be described as something a normal Activity can override unconditionally:
+   https://www.samsung.com/us/support/answer/ANS10001972/
+3. The new experiment preserves the existing `singleTask` activity/task on
+   ordinary `onStop()` (not finishing); **it clears the in-memory query and
+   decrypted results immediately** and resets the one-shot biometric prompt
+   latch for the next foreground session. No clip text or window dimensions
+   are written to disk. Explicit Esc, Close, successful copy or Open Main
+   continue to finish and remove the task.
+
+**Why this might help:** A minimized but still existing freeform task can be
+brought forward by the same QuickPaste launcher instead of re-created at the
+manifest's initial `560×620dp` sizing. Android `singleTask` and `onNewIntent`
+normally support bringing a running task to the foreground. However, One UI's
+window policy may still override the geometry even for a retained task, so
+**do not mark window-size retention PASS without on-device observation**.
+
+### Safe device acceptance test (PENDING)
+
+- [ ] W01: Open via physical hotkey with opt-in alias ON, then shrink
+  QuickPaste to a narrow, short panel and move it aside.
+- [ ] W02: Press the DeX window's **minimize** control (not Esc or Close),
+  then call the *same* Samsung shortcut. Does the **same size and location**
+  return, rather than the vertically extended default?
+- [ ] W03: Repeat W02 three times, including when another app's input has
+  focus. Query should be blank on reentry; no previous result list remains
+  visible without an unlocked vault.
+- [ ] W04: With the vault LOCKED/background auto-lock elapsed, hotkey
+  reopening must require strong biometrics and show **no cached clip content**
+  until the vault is unlocked.
+- [ ] W05: With the panel open, press **Esc** or copy and close; relaunch
+  with hotkey. This is a fresh window: full geometry restoration after an
+  *explicit close* is not promised by this first fix.
+- [ ] W06: Verify DeX taskbar/minimized instance doesn't multiply with
+  repeated hotkeys. Turning the launcher option OFF retains normal Main icon
+  and remains a data-preserving rollback.
+
+If W02 still resets bounds while W03/W04 pass, the cause includes One UI 8's
+launch-geometry policy beyond ClipVault's own `onStop` handling. Next
+investigation would be bounded per-display geometry persistence plus
+`ActivityOptions.setLaunchBounds()` from a controlled launcher activity,
+or a small default DeX window setting (Samsung's documented launch dimensions).
+Those require a separate review because hotkey launches come from the
+Samsung system rather than ClipVault itself.
+
+Implementation note: Keeping the task alive is **not** keeping decrypted UI
+state alive. The ViewModel's `clear()` cancels searches and replaces results
+with the LOCKED state during `onStop`; it re-queries only if the shared vault
+is still unlocked on foreground return. The app-wide background auto-lock and
+screen-off locks remain in force.
