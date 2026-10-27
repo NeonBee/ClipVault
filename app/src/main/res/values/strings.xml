@@ -180,7 +180,7 @@
     <string name="quick_paste_launcher_section">DeX / hardware keyboard</string>
     <string name="quick_paste_launcher_toggle">Show separate Quick paste app icon</string>
     <string name="quick_paste_launcher_summary">Optional app shortcut target for Samsung DeX. This does not change Ctrl / Cmd key mappings.</string>
-    <string name="quick_paste_launcher_warning">Other apps may open Quick paste through this icon. Clips remain behind the existing vault lock and strong biometric authentication. Disable the switch to remove the extra icon.</string>
+    <string name="quick_paste_launcher_warning">Experimental: some Open app actions may open Quick paste instead of Main Vault when enabled. Other apps may open this window, but clips still require vault unlock and strong biometrics. Turn this off to restore normal package-level launching.</string>
     <string name="quick_paste_launcher_error">Could not change the Quick paste launcher shortcut.</string>
     <string name="quick_paste_title">Quick paste</string>
     <string name="quick_paste_shortcut_long">Search and copy a clip</string>
