@@ -14,6 +14,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import dev.clipvault.app.ClipVaultApp
 import dev.clipvault.app.MainActivity
@@ -32,7 +34,8 @@ import dev.clipvault.app.ui.theme.ClipVaultTheme
  * - A locked vault goes through the same BiometricPrompt + CryptoObject unlock as the main app.
  *   There is no plaintext cache: without an open vault this window shows nothing from it.
  * - The query and results live in the ViewModel only and are cleared on close or lock.
- * - Enter restores the selected clip with EXTRA_IS_SENSITIVE and finishes. No auto-paste:
+ * - Enter restores the selected clip with EXTRA_IS_SENSITIVE and closes by default; an
+ *   opt-in setting allows successive copies without closing. No auto-paste:
  *   the user returns to the original app and presses Ctrl+V.
  */
 class QuickPasteActivity : AppCompatActivity() {
@@ -41,6 +44,7 @@ class QuickPasteActivity : AppCompatActivity() {
     private lateinit var unlocker: BiometricVaultUnlock
     /** True while a biometric prompt or the database open is in flight; stopping then must not close us. */
     private var authenticating = false
+    private var keepOpenAfterCopy by mutableStateOf(false)
     private val lockListener = Runnable { viewModel.onVaultLocked() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,6 +53,7 @@ class QuickPasteActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
         enableEdgeToEdge()
         app = application as ClipVaultApp
+        keepOpenAfterCopy = app.settings().getBoolean(ClipVaultApp.PREF_QUICK_PASTE_KEEP_OPEN, false)
         unlocker = BiometricVaultUnlock(this, app, VaultKeyManager(this), unlockListener)
         app.addLockListener(lockListener)
         onBackPressedDispatcher.addCallback(this) { close() }
@@ -66,6 +71,8 @@ class QuickPasteActivity : AppCompatActivity() {
                     onClose = ::close,
                     onUnlock = ::startUnlock,
                     onOpenApp = ::openMainApp,
+                    keepOpenAfterCopy = keepOpenAfterCopy,
+                    onKeepOpenChange = ::setKeepOpenAfterCopy,
                 )
             }
         }
@@ -144,6 +151,11 @@ class QuickPasteActivity : AppCompatActivity() {
         if (!isFinishing && !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) close()
     }
 
+    private fun setKeepOpenAfterCopy(enabled: Boolean) {
+        app.settings().edit().putBoolean(ClipVaultApp.PREF_QUICK_PASTE_KEEP_OPEN, enabled).apply()
+        keepOpenAfterCopy = enabled
+    }
+
     private fun copySelected() {
         val item = viewModel.state.value.selectedItem ?: return
         if (!app.isUnlocked) {
@@ -154,7 +166,7 @@ class QuickPasteActivity : AppCompatActivity() {
         if (!SensitiveClipboard.systemShowsConfirmation) {
             Toast.makeText(applicationContext, R.string.clipboard_copied, Toast.LENGTH_SHORT).show()
         }
-        close()
+        if (QuickPasteCopyPolicy.shouldCloseAfterCopy(keepOpenAfterCopy)) close()
     }
 
     private fun openMainApp() {
