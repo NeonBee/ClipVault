@@ -27,6 +27,17 @@ jobs:
       - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;27.2.12479018 cmake;3.22.1
+      - name: PowerShell device deploy helper syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile('scripts/deploy-debug.ps1', [ref]$tokens, [ref]$parseErrors)
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | ForEach-Object { Write-Host $_.ToString() }
+            exit 1
+          }
+
       - name: Unit, lint, native and APK checks
         run: ./gradlew --no-daemon testDebugUnitTest lintDebug externalNativeBuildDebug assembleDebug
       - name: Assert offline manifest
