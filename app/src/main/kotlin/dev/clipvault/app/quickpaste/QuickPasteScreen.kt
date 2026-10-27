@@ -205,8 +205,7 @@ private fun ColumnScope.SearchPane(
     // Keep the option next to the existing keyboard hint so the 240x260dp DeX window can
     // wrap them independently. This controls copy-close only, NOT window z-order/topmost.
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
-        verticalAlignment = Alignment.CenterVertically) {
+        verticalArrangement = Arrangement.spacedBy(0.dp)) {
         Text(stringResource(R.string.quick_paste_keys_hint),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
