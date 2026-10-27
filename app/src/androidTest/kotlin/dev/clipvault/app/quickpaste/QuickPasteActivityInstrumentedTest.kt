@@ -44,22 +44,31 @@ class QuickPasteActivityInstrumentedTest {
         }
     }
 
-    @Test fun leavingTheWindowFinishesIt() {
-        val scenario = ActivityScenario.launch(QuickPasteActivity::class.java)
-        // Wait until any automatic unlock attempt has settled (no biometrics on CI emulators).
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        var authenticating = false
-        scenario.onActivity { authenticating = it.viewModels().state.value.gate == QuickPasteGate.UNLOCKING }
-        assumeFalse("a real biometric prompt is up", authenticating)
-        // The window finishes itself inside onStop, so moveToState may report the target it never reached.
-        runCatching { scenario.moveToState(Lifecycle.State.CREATED) }
-        val deadline = System.currentTimeMillis() + 5_000L
-        while (scenario.state != Lifecycle.State.DESTROYED && System.currentTimeMillis() < deadline) {
+    @Test fun leavingTheWindowRetainsTaskButClearsProtectedState() {
+        ActivityScenario.launch(QuickPasteActivity::class.java).use { scenario ->
+            // CI emulators have no real biometric prompt; avoid suspending one on a physical device.
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-            Thread.sleep(50)
+            var authenticating = false
+            scenario.onActivity {
+                authenticating = it.viewModels().state.value.gate == QuickPasteGate.UNLOCKING
+            }
+            assumeFalse("a real biometric prompt is up", authenticating)
+
+            // Minimizing/stopping the freeform window must NOT finish the Activity: DeX needs the
+            // existing task to restore the user-adjusted window bounds on the next hotkey.
+            scenario.moveToState(Lifecycle.State.CREATED)
+            assertEquals(Lifecycle.State.CREATED, scenario.state)
+            scenario.onActivity { activity ->
+                val vm = activity.viewModels()
+                // Inactive QuickPaste must expose no cached query or decrypted result data.
+                assertEquals(QuickPasteGate.LOCKED, vm.state.value.gate)
+                assertTrue(vm.state.value.results.isEmpty())
+                assertEquals("", vm.state.value.query)
+                // After the vault locks, foreground re-entry must not bypass a fresh biometric.
+                assertTrue(!app.isUnlocked)
+                assertTrue(!vm.autoPromptConsumed)
+            }
         }
-        assertEquals(Lifecycle.State.DESTROYED, scenario.state)
-        scenario.close()
     }
 
     @Test fun copyBackClipIsMarkedSensitive() {
