@@ -72,7 +72,7 @@ class QuickPasteActivity : AppCompatActivity() {
                     onUnlock = ::startUnlock,
                     onOpenApp = ::openMainApp,
                     keepOpenAfterCopy = keepOpenAfterCopy,
-                    onKeepOpenChange = ::setKeepOpenAfterCopy,
+                    onKeepOpenChange = ::updateKeepOpenPreference,
                 )
             }
         }
@@ -151,7 +151,7 @@ class QuickPasteActivity : AppCompatActivity() {
         if (!isFinishing && !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) close()
     }
 
-    private fun setKeepOpenAfterCopy(enabled: Boolean) {
+    private fun updateKeepOpenPreference(enabled: Boolean) {
         app.settings().edit().putBoolean(ClipVaultApp.PREF_QUICK_PASTE_KEEP_OPEN, enabled).apply()
         keepOpenAfterCopy = enabled
     }
