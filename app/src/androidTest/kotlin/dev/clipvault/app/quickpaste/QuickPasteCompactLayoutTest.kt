@@ -2,10 +2,16 @@ package dev.clipvault.app.quickpaste
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -19,6 +25,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Density
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.clipvault.app.R
 import dev.clipvault.app.data.ClipItem
@@ -37,11 +44,23 @@ class QuickPasteCompactLayoutTest {
     private var unlocks = 0
     private var keepOpenAfterCopy by mutableStateOf(false)
 
+    // CI's default emulator is narrower than a normal DeX window and exposes a software IME.
+    // Simulate explicit dp-sized hardware-keyboard DeX panels to make viewport tests repeatable.
+    private val hardwareInputMode = object : InputModeManager {
+        override val inputMode: InputMode get() = InputMode.Keyboard
+        override fun requestInputMode(inputMode: InputMode): Boolean = true
+    }
+
     private fun showAtMinimumSize(initial: QuickPasteState, width: Dp = 240.dp, height: Dp = 260.dp) {
         state = initial
         compose.setContent {
-            Box(Modifier.size(width = width, height = height)) {
-                QuickPasteScreen(
+            CompositionLocalProvider(
+                LocalDensity provides Density(1f),
+                LocalInputModeManager provides hardwareInputMode,
+                LocalSoftwareKeyboardController provides null,
+            ) {
+                Box(Modifier.size(width = width, height = height)) {
+                    QuickPasteScreen(
                     state = state,
                     onQueryChange = { state = state.copy(query = it) },
                     onKey = { state = state.copy(selected = QuickPasteSelection.move(state.selected, it, state.results.size)) },
@@ -51,8 +70,9 @@ class QuickPasteCompactLayoutTest {
                     onUnlock = { unlocks++ },
                     onOpenApp = {},
                     keepOpenAfterCopy = keepOpenAfterCopy,
-                    onKeepOpenChange = { keepOpenAfterCopy = it },
-                )
+                        onKeepOpenChange = { keepOpenAfterCopy = it },
+                    )
+                }
             }
         }
     }
