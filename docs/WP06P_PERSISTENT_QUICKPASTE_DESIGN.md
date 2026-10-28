@@ -24,8 +24,11 @@ when another app takes focus. This option is not labelled "Always on Top".
   search UI open for another selection. The search query and selection remain
   available while the window stays foregrounded. No automatic paste into
   another window occurs; the user switches to the target window to paste.
-- Toggle is a small `FilterChip` next to the existing keyboard hint in the
-  QuickPaste search pane. It can be changed while the window is open.
+- On normal-sized windows, the option is a labeled `FilterChip` next to the keyboard
+  hint (the layout the user tested). When the DeX window is very short (at or below
+  320dp), the toggle moves to the search field's trailing copy icon so the
+  240×260dp minimum still shows the option and a clip row. The icon has an
+  accessible label and selected tint. It can be changed while the window is open.
 - The preference is stored in app-private `ClipVaultApp.settings()` using
   `PREF_QUICK_PASTE_KEEP_OPEN` and defaults to `false`. Only a Boolean is
   stored; **no query, clip text, or clipboard content is persisted**.
@@ -45,7 +48,7 @@ when another app takes focus. This option is not labelled "Always on Top".
 | P01 | New/previous user defaults to OFF and copy closes | Unit test; DeX pending |
 | P02 | Toggle ON and consecutive Enter/click copies keep QuickPaste open | Unit/Compose coverage; DeX pending |
 | P03 | Toggle OFF while open restores copy-and-close | Unit/Compose coverage; DeX pending |
-| P04 | 240×260dp window still exposes a toggle, search and first result | Compose instrumentation CI pending |
+| P04 | 240×260dp window still exposes a toggle, search and first result | Responsive layout fix committed; CI pending |
 | P05 | Esc/Close explicitly closes regardless of toggle | Prior behavior; DeX regression pending |
 | P06 | Minimize/background wipes all decrypted search state | WP-06S instrumentation; regression pending |
 | P07 | Locked vault cannot copy without strong biometric authentication | WP-06S device evidence; regression pending |
@@ -84,3 +87,22 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-debug.p
 **Do not** run `connectedDebugAndroidTest`, uninstall or `pm clear`
 against the personal-Vault device: instrumentation uses a disposable CI
 emulator; uninstall/clear can destroy encrypted Vault data/Keystore state.
+
+## Device report and CI regression correction (2026-10-28)
+
+**User's device result:** On the Samsung DeX real device, **all user-requested
+behaviors worked as expected**: opt-in copying without closing, normal default
+copy-and-close, and the existing QuickPaste flow. This is an observed UX PASS
+on the tested configuration, not a claim of universal compatibility.
+
+**CI review:** run #66 `verify` passed but `instrumentation` failed only
+`QuickPasteCompactLayoutTest.keepOpenSettingTogglesWithinTheMinimumWindow`:
+the footer `FilterChip` was off-screen in the synthetic 240×260dp panel.
+This exposed a real small-viewport affordance concern even though the user's
+larger window worked normally. Fixed in commit `480a25f`: on short windows
+(height ≤320dp), the switch is an accessible `IconToggleButton` integrated
+into the search field; on normal windows, preserve the user-tested footer chip.
+This is **not** an always-on-top function and adds no permission. CI #67 must
+confirm the minimum-size regression test before merging.
+
+PR #17 remains Draft and stacked on PR #16. Do not merge until CI passes.
