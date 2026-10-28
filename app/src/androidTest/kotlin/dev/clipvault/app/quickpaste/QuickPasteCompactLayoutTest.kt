@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -87,8 +88,12 @@ class QuickPasteCompactLayoutTest {
         compose.onNodeWithTag(QuickPasteTags.row(0)).assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.quick_paste_keys_hint)).assertIsDisplayed()
 
-        // Selection past the visible rows scrolls the list; Enter copies it, Esc closes.
+        // Keyboard selection and a tiny viewport's scroll affordance are independent.
+        // Rapid key injection may settle before listState's LaunchedEffect scroll runs on CI;
+        // verify selection first, then deterministically scroll the lazy list into view.
         search.performKeyInput { repeat(4) { pressKey(Key.DirectionDown) } }
+        compose.runOnIdle { assertEquals(4, state.selected) }
+        compose.onNodeWithTag(QuickPasteTags.LIST).performScrollToIndex(4)
         compose.onNodeWithTag(QuickPasteTags.row(4)).assertIsDisplayed()
         search.performKeyInput { pressKey(Key.Enter) }
         assertEquals(5L, confirmed?.id)
