@@ -25,10 +25,11 @@ when another app takes focus. This option is not labelled "Always on Top".
   available while the window stays foregrounded. No automatic paste into
   another window occurs; the user switches to the target window to paste.
 - On normal-sized windows, the option is a labeled `FilterChip` next to the keyboard
-  hint (the layout the user tested). When the DeX window is very short (at or below
-  320dp), the toggle moves to the search field's trailing copy icon so the
-  240×260dp minimum still shows the option and a clip row. The icon has an
-  accessible label and selected tint. It can be changed while the window is open.
+  hint (the layout the user tested). In a compact window (content width ≤480dp
+  **or** height ≤420dp) the option moves to an accessible trailing search-field
+  toggle. The normal leading search icon is removed in compact mode so the
+  input field and result list do not lose space. The icon has selected tint.
+  This is layout detection, not a system keyboard mapping change.
 - The preference is stored in app-private `ClipVaultApp.settings()` using
   `PREF_QUICK_PASTE_KEEP_OPEN` and defaults to `false`. Only a Boolean is
   stored; **no query, clip text, or clipboard content is persisted**.
@@ -106,3 +107,31 @@ This is **not** an always-on-top function and adds no permission. CI #67 must
 confirm the minimum-size regression test before merging.
 
 PR #17 remains Draft and stacked on PR #16. Do not merge until CI passes.
+
+## Real device report: bottom toggle persists at minimum size (2026-10-28)
+
+The user reported the keep-open toggle **still appearing in the bottom
+footer instead of the right side of the search box** when the DeX window
+was minimized to its smallest size. The current installed APK revision was
+not independently identified, so both an older build and the height-only
+layout branch are viable explanations. The prior code switched to the
+search trailing slot only if `BoxWithConstraints.maxHeight <= 320.dp`, which
+may not hold in Samsung's actual Activity content coordinates.
+
+**Fix:** detect either small width (≤480dp) or small height (≤420dp), replace
+rather than add to the search icon space, and keep only a compact key hint
+below the list. Add tests for 240×260dp, narrow-but-tall 420×620dp, and
+regular 560×620dp windows. Distinct Compose semantics tags confirm the icon
+exists and the footer chip does *not* exist in compact layouts; normal mode
+keeps the user-tested footer chip.
+
+**CI history:** run #68 had `verify` PASS and one instrumentation FAIL
+(`QuickPasteCompactLayoutTest.searchListHintAndKeysFitTheMinimumWindow`),
+where item 4 was not visible at 240×260dp after adding an extra search-field
+icon. Compact mode now **replaces** the leading search icon with the toggle,
+so the text field retains its original icon-space footprint.
+
+Do not mark this layout correction PASS until both the new CI and target
+Samsung DeX device re-test. Update debug APK *in place*, without clearing
+Vault data, and verify the installed version is built from this PR's latest
+head commit.
