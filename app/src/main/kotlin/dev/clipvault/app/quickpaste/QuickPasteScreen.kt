@@ -27,7 +27,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -199,7 +199,9 @@ private fun ColumnScope.SearchPane(
                     modifier = Modifier.testTag(QuickPasteTags.KEEP_OPEN),
                 ) {
                     Icon(
-                        Icons.Default.ContentCopy,
+                        // The lock refers to retaining this panel, NOT locking/unlocking the vault.
+                        // Keep the accessible label tied to the actual copy-then-close policy.
+                        if (keepOpenAfterCopy) Icons.Default.Lock else Icons.Default.LockOpen,
                         contentDescription = stringResource(R.string.quick_paste_keep_open),
                         tint = if (keepOpenAfterCopy) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
