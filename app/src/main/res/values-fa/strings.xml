@@ -55,6 +55,12 @@
     <string name="type_reset">برای تأیید RESET را وارد کنید</string>
     <string name="vault_reset_complete">خزانه بازنشانی شد؛ برای ساخت خزانه رمزنگاری‌شده جدید، آن را باز کنید.</string>
     <string name="reset_failed">بازنشانی امن خزانه انجام نشد.</string>
+    <string name="quick_paste_launcher_title">ClipVault — چسباندن سریع</string>
+    <string name="quick_paste_launcher_section">DeX / صفحه‌کلید فیزیکی</string>
+    <string name="quick_paste_launcher_toggle">نمایش نماد جداگانه برای چسباندن سریع</string>
+    <string name="quick_paste_launcher_summary">ورودی اختیاری برای میان‌بر برنامه در Samsung DeX. تنظیم کلیدهای Ctrl و Cmd تغییر نمی‌کند.</string>
+    <string name="quick_paste_launcher_warning">آزمایشی: با فعال بودن این گزینه، برخی فرمان‌های باز کردن برنامه ممکن است چسباندن سریع را به جای خزانه اصلی باز کنند. برنامه‌های دیگر نیز می‌توانند این پنجره را باز کنند، اما کلیپ‌ها همچنان به قفل خزانه و احراز هویت بیومتریک قوی نیاز دارند. برای بازگشت به رفتار عادی، این گزینه را خاموش کنید.</string>
+    <string name="quick_paste_launcher_error">تغییر میان‌بر چسباندن سریع ممکن نشد.</string>
     <string name="quick_paste_title">چسباندن سریع</string>
     <string name="quick_paste_shortcut_long">جست‌وجو و کپی یک کلیپ</string>
     <string name="quick_paste_search_hint">جست‌وجوی کلیپ‌ها</string>

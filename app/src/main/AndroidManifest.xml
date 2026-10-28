@@ -80,6 +80,32 @@
                 android:minWidth="240dp" />
         </activity>
 
+        <!-- WP-06S DeX hotkey PoC: optional SECOND launcher entry for Samsung's app-shortcut picker.
+             Kept disabled until the user opts in from Settings. The target activity itself stays
+             unexported. Enabling this exported alias lets third-party apps *open* the biometric-
+             protected QuickPaste window, but grants no clipboard contents or vault data. -->
+        <activity-alias
+            android:name=".quickpaste.QuickPasteLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_vault"
+            android:label="@string/quick_paste_launcher_title"
+            android:targetActivity=".quickpaste.QuickPasteActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Experimental WP-06S route: PackageManager.getLaunchIntentForPackage()
+                 resolves MAIN/INFO before MAIN/LAUNCHER. One UI may not use that API.
+                 This filter only affects the already opt-in launcher alias; its manifest
+                 default remains disabled. Package-level "Open app" may now show QuickPaste
+                 while enabled, so this is not intended for release without device checks. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.INFO" />
+            </intent-filter>
+        </activity-alias>
+
         <service
             android:name=".clipboard.ClipboardCaptureService"
             android:exported="false"
