@@ -70,6 +70,7 @@ object QuickPasteTags {
     const val SEARCH = "quick_paste_search"
     const val LIST = "quick_paste_list"
     const val KEEP_OPEN = "quick_paste_keep_open"
+    const val KEEP_OPEN_FOOTER = "quick_paste_keep_open_footer"
     fun row(index: Int) = "quick_paste_row_$index"
 }
 
@@ -247,7 +248,7 @@ private fun ColumnScope.SearchPane(
                 selected = keepOpenAfterCopy,
                 onClick = { onKeepOpenChange(!keepOpenAfterCopy) },
                 label = { Text(stringResource(R.string.quick_paste_keep_open)) },
-                modifier = Modifier.testTag(QuickPasteTags.KEEP_OPEN),
+                modifier = Modifier.testTag(QuickPasteTags.KEEP_OPEN_FOOTER),
             )
         }
     }
