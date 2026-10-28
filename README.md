@@ -2,7 +2,7 @@
 
 ClipVault is an offline-first encrypted clipboard archive for Android. It captures text through a narrowly scoped Shizuku bridge, stores the vault in SQLCipher, and requires a strong biometric-backed Android Keystore key for every unlock.
 
-[فارسی](README_FA.md) · [Security](SECURITY.md) · [Architecture](docs/ARCHITECTURE.md) · [Backup format](docs/BACKUP_FORMAT.md)
+[فارسی](README_FA.md) · [Security](SECURITY.md) · [Architecture](docs/ARCHITECTURE.md) · [DeX completion](docs/WP06_COMPLETION.md) · [Backup format](docs/BACKUP_FORMAT.md)
 
 ![ClipVault theme system](docs/theme-preview.svg)
 
@@ -17,7 +17,7 @@ ClipVault is an offline-first encrypted clipboard archive for Android. It captur
 - Exports and imports versioned `.cvault` files protected with Argon2id and AES-256-GCM.
 - Offers System, Light, Dark and AMOLED themes, Android 12+ Dynamic Color, six accent palettes and live preview.
 - Supports Persian RTL and English LTR layouts.
-- Quick paste window for DeX and hardware keyboards: long-press the app icon (or the DeX taskbar icon) → **Quick paste**, type to search, ↑/↓ to pick, Enter to copy, Esc to close, then Ctrl+V in the original app. It never pastes by itself.
+- Samsung DeX QuickPaste window: open via the long-press **Quick paste** shortcut or the optional, separately enabled **ClipVault Quick paste** launcher entry for Samsung's hardware-keyboard app shortcut. Type to search, use ↑/↓ and Enter (or click a result) to copy, Esc to close, then paste manually into the target app. **Keep open after copy** defaults OFF; turn it ON in QuickPaste to make multiple copies without closing. It does not auto-paste or stay always on top.
 
 ClipVault has no `INTERNET` permission, analytics, account system, cloud sync or telemetry.
 
@@ -89,5 +89,7 @@ Biometrics protect key use, not merely a screen. The SQLCipher key is random, ne
 Read [SECURITY.md](SECURITY.md) and the [threat model](docs/THREAT_MODEL.md) before treating the project as a password manager or a substitute for an independently audited secrets vault.
 
 ## Status
+
+The Samsung Galaxy S23 Ultra / Android 16 / One UI 8 DeX UX from WP-06, WP-06S and WP-06P-A is implemented and device-validated; PRs [#15](https://github.com/NeonBee/ClipVault/pull/15), [#16](https://github.com/NeonBee/ClipVault/pull/16) and [#17](https://github.com/NeonBee/ClipVault/pull/17) are merged into `hardening/base`. The final #17 verify and instrumentation CI passed ([run #79](https://github.com/NeonBee/ClipVault/actions/runs/40662764365)). See [completion evidence, limits and remaining work](docs/WP06_COMPLETION.md). The planned WP-07 Secure Copy / Secure Paste path is **not implemented**; normal QuickPaste copies plaintext to the Android system clipboard.
 
 Version `2.0.0` builds against API 37 and compiles all four Android ABIs. Its device suite covers all theme modes, navigation, multi-selection, Trash recovery, encrypted backup failure modes, native/fallback parity, the real v1 → v2 migration and indexed search over 20,000 encrypted clips. The security/data suite and a live Shizuku protocol-v2 UserService bind have also passed on an Android 13 HyperOS device. Shizuku clipboard behavior still needs validation across more vendor ROMs before a production security claim would be responsible.
