@@ -95,8 +95,10 @@ fun QuickPasteScreen(
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
-            // A narrow DeX window must keep the option reachable without shrinking the clip list.
-            val compactHeight = maxHeight <= 320.dp
+            // DeX's externally reported minimum window dimensions can differ from the
+            // Activity content area in dp. Use both axes: even a tall, narrow window needs
+            // the toggle inside the search field rather than below the scrollable clip list.
+            val compactLayout = maxWidth <= 480.dp || maxHeight <= 420.dp
             Column(
                 Modifier.widthIn(max = 640.dp).fillMaxSize().padding(16.dp)
                     // Preview runs parent-first, before the focused field or button: Esc always closes,
@@ -129,7 +131,7 @@ fun QuickPasteScreen(
                 when (state.gate) {
                     QuickPasteGate.READY -> SearchPane(
                         state, onQueryChange, onSelectIndex, onConfirm,
-                        keepOpenAfterCopy, onKeepOpenChange, compactHeight,
+                        keepOpenAfterCopy, onKeepOpenChange, compactLayout,
                     )
                     QuickPasteGate.UNLOCKING -> StatusPane(stringResource(R.string.quick_paste_unlocking), null) {
                         CircularProgressIndicator(Modifier.size(32.dp))
@@ -170,7 +172,7 @@ private fun ColumnScope.SearchPane(
     onConfirm: () -> Unit,
     keepOpenAfterCopy: Boolean,
     onKeepOpenChange: (Boolean) -> Unit,
-    compactHeight: Boolean,
+    compactLayout: Boolean,
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -182,9 +184,13 @@ private fun ColumnScope.SearchPane(
         value = state.query,
         onValueChange = onQueryChange,
         singleLine = true,
-        leadingIcon = { Icon(Icons.Default.Search, null) },
-        // A 240x260dp panel cannot show an extra FilterChip row beneath its list.
-        trailingIcon = if (compactHeight) {
+        // Replace, rather than add to, the search icon slot in the compact layout.
+        // Keeping only one 48dp icon leaves as much room for the text field as before
+        // and avoids making the field taller or the list too short at 240x260dp.
+        leadingIcon = if (compactLayout) null else {
+            { Icon(Icons.Default.Search, null) }
+        },
+        trailingIcon = if (compactLayout) {
             {
                 IconToggleButton(
                     checked = keepOpenAfterCopy,
@@ -226,7 +232,7 @@ private fun ColumnScope.SearchPane(
             }
         }
     }
-    if (compactHeight) {
+    if (compactLayout) {
         Text(stringResource(R.string.quick_paste_keys_hint),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
