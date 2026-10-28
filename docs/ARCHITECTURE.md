@@ -4,7 +4,7 @@ ClipVault uses one Android application module with explicit boundaries instead o
 
 ## Layers
 
-- **Compose presentation:** `MainActivity` with Navigation Compose destinations, `VaultViewModel`, StateFlow and Paging 3, plus `QuickPasteActivity`: an unexported, recents-excluded search-and-copy window started from ClipVault's dynamic launcher shortcut. Both windows unlock through `BiometricVaultUnlock` and copy back through `SensitiveClipboard`.
+- **Compose presentation:** `MainActivity` with Navigation Compose destinations, `VaultViewModel`, StateFlow and Paging 3, plus `QuickPasteActivity`: an unexported, recents-excluded search-and-copy window. It opens through ClipVault's dynamic launcher shortcut or an optional exported `QuickPasteLauncherAlias` (`MAIN/LAUNCHER` and `MAIN/INFO`, disabled by default) used for Samsung's DeX hardware-keyboard app shortcut. Both windows unlock through `BiometricVaultUnlock` and user-selected content is copied back through `SensitiveClipboard`. QuickPaste has a default-off, persisted Boolean **Keep open after copy** preference, not a topmost overlay.
 - **Application container:** owns UI settings and the encrypted backup manager. Database ownership remains in `ClipVaultApp` so lock transitions can close SQLCipher deterministically.
 - **Encrypted persistence:** `VaultRepository` is the synchronized SQLCipher boundary. Schema v3 contains clips, collections, tags, links, capture rules and an FTS5 index with the persistent FTS5 `secure-delete` option. The v2 → v3 migration enables it, rebuilds the index and truncates the WAL so terms of clips deleted under v2 are purged.
 - **Locked-state ingress:** `SecurePendingStore` uses a separate non-exportable Keystore AES key and HMAC lookup key. It can accept clipboard text while the biometric database key is absent.
@@ -43,7 +43,7 @@ The secure path is deliberately not implemented with Accessibility Service, vend
 
 The database key exists only while the vault is unlocked. `lockVault()` immediately makes the repository unavailable and closes SQLCipher on the serialized I/O executor, then notifies every open window on the main thread so it drops decrypted state. Background capture continues into encrypted staging. Maintenance requested while locked is applied after the next biometric unlock.
 
-Auto-lock is process-wide (`VaultAutoLock`, driven by activity start/stop callbacks in `ClipVaultApp`): the timer is armed only when the last started ClipVault activity stops for a reason other than a configuration change, and cancelled when any activity starts. Screen-off locks immediately. QuickPaste additionally closes itself when hidden and clears its in-memory query and results on close or lock.
+Auto-lock is process-wide (`VaultAutoLock`, driven by activity start/stop callbacks in `ClipVaultApp`): the timer is armed only when the last started ClipVault activity stops for a reason other than a configuration change, and cancelled when any activity starts. Screen-off locks immediately. QuickPaste **does not automatically remove its task on ordinary `onStop()`**, allowing Samsung DeX's resized window to be resumed; instead it immediately clears the in-memory query/decrypted results and resets the biometric auto-prompt latch. Vault lock also clears its results. Esc/explicit Close and default copy-and-close remove the task; user-enabled keep-open-after-copy leaves it visible until otherwise closed or backgrounded. See [WP-06 completion](WP06_COMPLETION.md).
 
 ## Offline boundary
 
