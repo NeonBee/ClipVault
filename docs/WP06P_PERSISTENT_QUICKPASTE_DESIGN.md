@@ -135,3 +135,22 @@ Do not mark this layout correction PASS until both the new CI and target
 Samsung DeX device re-test. Update debug APK *in place*, without clearing
 Vault data, and verify the installed version is built from this PR's latest
 head commit.
+
+## Compact control icon preference and device verification (2026-10-28)
+
+The user confirmed on the real Samsung DeX device that the **compact-layout
+toggle now appears at the right of the search box**, and the keep-open
+functionality continues to work as expected (**device PASS** for layout and
+behavior). The user prefers a **lock icon** over the previous copy icon.
+
+UI-only follow-up: the compact toggle displays an **open lock when OFF** and
+a **closed lock when ON**. On/off tint and checked semantics follow the
+existing `keepOpenAfterCopy` Boolean. The accessible label remains
+**Keep open after copy**, NOT **Lock Vault**; this option only controls
+whether copying closes QuickPaste. Vault authentication, actual locking
+and background content clearing remain unchanged. Normal windows retain
+the labeled footer chip. No new permission or Always on Top behavior.
+
+The icon change was committed *after* the user's functional device test.
+Verify the new icons on an updated APK before marking this visual mapping
+PASS. PR #17 remains Draft and stacked on PR #16 pending CI/final review.
