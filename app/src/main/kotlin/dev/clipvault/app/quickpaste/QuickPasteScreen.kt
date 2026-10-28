@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -26,11 +27,13 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -91,7 +94,9 @@ fun QuickPasteScreen(
         if (state.gate != QuickPasteGate.READY) runCatching { rootFocus.requestFocus() }
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
+        BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
+            // A narrow DeX window must keep the option reachable without shrinking the clip list.
+            val compactHeight = maxHeight <= 320.dp
             Column(
                 Modifier.widthIn(max = 640.dp).fillMaxSize().padding(16.dp)
                     // Preview runs parent-first, before the focused field or button: Esc always closes,
@@ -124,7 +129,7 @@ fun QuickPasteScreen(
                 when (state.gate) {
                     QuickPasteGate.READY -> SearchPane(
                         state, onQueryChange, onSelectIndex, onConfirm,
-                        keepOpenAfterCopy, onKeepOpenChange,
+                        keepOpenAfterCopy, onKeepOpenChange, compactHeight,
                     )
                     QuickPasteGate.UNLOCKING -> StatusPane(stringResource(R.string.quick_paste_unlocking), null) {
                         CircularProgressIndicator(Modifier.size(32.dp))
@@ -165,6 +170,7 @@ private fun ColumnScope.SearchPane(
     onConfirm: () -> Unit,
     keepOpenAfterCopy: Boolean,
     onKeepOpenChange: (Boolean) -> Unit,
+    compactHeight: Boolean,
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -177,6 +183,23 @@ private fun ColumnScope.SearchPane(
         onValueChange = onQueryChange,
         singleLine = true,
         leadingIcon = { Icon(Icons.Default.Search, null) },
+        // A 240x260dp panel cannot show an extra FilterChip row beneath its list.
+        trailingIcon = if (compactHeight) {
+            {
+                IconToggleButton(
+                    checked = keepOpenAfterCopy,
+                    onCheckedChange = onKeepOpenChange,
+                    modifier = Modifier.testTag(QuickPasteTags.KEEP_OPEN),
+                ) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = stringResource(R.string.quick_paste_keep_open),
+                        tint = if (keepOpenAfterCopy) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        } else null,
         placeholder = { Text(stringResource(R.string.quick_paste_search_hint)) },
         keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Go),
         keyboardActions = KeyboardActions(onGo = { onConfirm() }),
@@ -203,19 +226,24 @@ private fun ColumnScope.SearchPane(
             }
         }
     }
-    // Keep the option next to the existing keyboard hint so the 240x260dp DeX window can
-    // wrap them independently. This controls copy-close only, NOT window z-order/topmost.
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(0.dp)) {
+    if (compactHeight) {
         Text(stringResource(R.string.quick_paste_keys_hint),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
-        FilterChip(
-            selected = keepOpenAfterCopy,
-            onClick = { onKeepOpenChange(!keepOpenAfterCopy) },
-            label = { Text(stringResource(R.string.quick_paste_keep_open)) },
-            modifier = Modifier.testTag(QuickPasteTags.KEEP_OPEN),
-        )
+    } else {
+        // Retain the labeled footer chip on normal-sized windows, where it was device-tested.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            Text(stringResource(R.string.quick_paste_keys_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FilterChip(
+                selected = keepOpenAfterCopy,
+                onClick = { onKeepOpenChange(!keepOpenAfterCopy) },
+                label = { Text(stringResource(R.string.quick_paste_keep_open)) },
+                modifier = Modifier.testTag(QuickPasteTags.KEEP_OPEN),
+            )
+        }
     }
 }
 
