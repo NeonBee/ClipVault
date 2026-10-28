@@ -1,6 +1,9 @@
 # WP-06 DeX UX
 
-> Windows에서 PR #15 실기기 검증 전에 APK를 갱신할 때는 [데이터 보존형 빌드·설치·실행 자동화](DEVICE_DEBUG_DEPLOY.md)의 `scripts/deploy-debug.ps1`을 사용한다. `adb uninstall`이나 실기기 `connectedDebugAndroidTest`는 사용하지 않는다.
+> **Current outcome (2026-10-28): WP-06 core DeX UX + WP-06S global shortcut + WP-06P-A keep-open are merged and target-device validated.** See [WP-06 completion / evidence matrix](WP06_COMPLETION.md). Steps 1–3, older `PR #15` instructions and the ~5-second session observations below remain historical; the unexplained re-authentication timing is a **separate non-blocking investigation**, not a claimed fix.
+
+
+> Windows에서 병합 코드 실기기 검증 시 [데이터 보존형 빌드·설치·실행 자동화](DEVICE_DEBUG_DEPLOY.md)의 `scripts/deploy-debug.ps1`을 사용한다. `adb uninstall`이나 실기기 `connectedDebugAndroidTest`는 사용하지 않는다.
 
 용어:
 - `PR #N`은 GitHub Pull Request 번호를 의미한다.
@@ -208,7 +211,7 @@ compact 높이에서는 좌측 검색 affordance 48dp가 추가되므로 제목�
 | 검색어가 있는 상태에서 다시 접기 | 결과/filter는 유지되고 검색창만 접힘; 돋보기에 active badge 표시 | PASS (2026-10-27, 실기기 확인) |
 | 창 높이를 420dp 이상으로 복구 | 일반 inline 검색창이 자동 복귀 | PASS (2026-10-27, 실기기 확인) |
 
-### PR #15 최종 실기기 검증 기록 (2026-10-27)
+### PR #15 최종 실기기 검증 기록 (2026-10-27, 이후 PR #16·#17 병합)
 
 - Windows에서 `scripts/deploy-debug.ps1`로 최신 PR #15 debug APK를 빌드·기존 앱 데이터 보존 방식으로 설치하고, 실행 및 변경사항 반영을 확인했다.
 - Samsung DeX의 compact 빠른 검색 UX 4개 항목은 사용자 실기기 검증 결과 모두 PASS.
