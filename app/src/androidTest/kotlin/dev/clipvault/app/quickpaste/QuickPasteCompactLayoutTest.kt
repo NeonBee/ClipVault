@@ -2,6 +2,7 @@ package dev.clipvault.app.quickpaste
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,11 +41,24 @@ class QuickPasteCompactLayoutTest {
     private var keepOpenAfterCopy by mutableStateOf(false)
 
 
-    private fun showAtMinimumSize(initial: QuickPasteState, width: Dp = 240.dp, height: Dp = 260.dp) {
+    private fun showAtMinimumSize(
+        initial: QuickPasteState,
+        width: Dp = 240.dp,
+        height: Dp = 260.dp,
+        syntheticDeXWindow: Boolean = false,
+    ) {
         state = initial
         compose.setContent {
             CompositionLocalProvider(LocalSoftwareKeyboardController provides null) {
-                Box(Modifier.size(width = width, height = height)) {
+                // CI's phone viewport is narrower than a full DeX window. Only the
+                // normal-window *branch existence* test uses requiredSize so the layout
+                // receives its requested DeX width even if part lies off the host screen.
+                val windowModifier = if (syntheticDeXWindow) {
+                    Modifier.requiredSize(width = width, height = height)
+                } else {
+                    Modifier.size(width = width, height = height)
+                }
+                Box(windowModifier) {
                     QuickPasteScreen(
                     state = state,
                     onQueryChange = { state = state.copy(query = it) },
@@ -113,6 +127,7 @@ class QuickPasteCompactLayoutTest {
             QuickPasteState(gate = QuickPasteGate.READY, searched = true),
             width = 560.dp,
             height = 620.dp,
+            syntheticDeXWindow = true,
         )
         // The synthetic 560×620dp window extends past the CI phone's visible viewport.
         // Verify the expected normal-size UI branch exists rather than requiring the
