@@ -1,107 +1,156 @@
-# WP-06P — Ditto-style persistent QuickPaste and Always on Top
+# WP-06P-A — Keep QuickPaste open after copy
 
-Status: **design/scoping only, not implemented** (2026-10-28).
-Base dependency: WP-06S PR #16, still Draft / unmerged.
-Goal: support repetitive copying and, if securely possible, a window remaining
-above other DeX windows. These are **different features**, not one switch.
+Status: **implementation / device validation pending** (2026-10-28).
+This is a *separate stacked PR* based on WP-06S PR #16
+(`feature/wp06s-quickpaste-launcher`). It should be rebased on
+`hardening/base` after PR #16 merges.
 
-## Device evidence and prior UX
+## Scope and explicit exclusion
 
-Galaxy S23 Ultra / One UI 8 / Samsung DeX:
+The user selected **only** the optional **Keep open after copy** behavior.
+True **Always on Top**, `SYSTEM_ALERT_WINDOW`, a floating overlay, pinning,
+AccessibilityService, key interception, auto-paste, a second APK and Windows
+remote-control testing are **not included** in this implementation.
 
-- `CATEGORY_INFO` launcher alias makes Samsung's hardware keyboard hotkey open
-  QuickPaste without a second APK. Existing Main icon still opens Main.
-- A resized QuickPaste window survives minimize → hotkey, **and the user has
-  confirmed the size is restored after fully closing and relaunching**.
-- No authentication bypass was observed in these tests.
-- Current copy action closes intentionally:
-  `QuickPasteActivity.copySelected()` calls
-  `SensitiveClipboard.write(this, item.content)` and then `close()`, which
-  invokes `finishAndRemoveTask()`.
-- The user's Windows-layout Bluetooth keyboard had Samsung system remapping
-  `Ctrl → Cmd`, `Cmd → Ctrl`, allowing app hotkeys that did not work with
-  identity bindings. The physical **right Ctrl acts like Win/Meta**; the
-  physical Win key may now be acting as Ctrl, subject to actual keyboard scan
-  mapping. The user explicitly **skipped remote Windows interoperability**
-  as a mandatory check; this is a scope decision, not a compatibility PASS.
+QuickPaste remains an ordinary DeX application window and can be obscured
+when another app takes focus. This option is not labelled "Always on Top".
 
-## Two independent feature contracts
+## Behavior
 
-### WP-06P-A — Copy and keep panel open (no new permissions)
+- Default **OFF**: selecting a result with Enter or a mouse/touch click copies
+  to the Android clipboard using `SensitiveClipboard.write()`, then closes
+  with `finishAndRemoveTask()` as before.
+- Opt-in **ON**: the same action copies, then leaves the QuickPaste task and
+  search UI open for another selection. The search query and selection remain
+  available while the window stays foregrounded. No automatic paste into
+  another window occurs; the user switches to the target window to paste.
+- On normal-sized windows, the option is a labeled `FilterChip` next to the keyboard
+  hint (the layout the user tested). In a compact window (content width ≤480dp
+  **or** height ≤420dp) the option moves to an accessible trailing search-field
+  toggle. The normal leading search icon is removed in compact mode so the
+  input field and result list do not lose space. The icon has selected tint.
+  This is layout detection, not a system keyboard mapping change.
+- The preference is stored in app-private `ClipVaultApp.settings()` using
+  `PREF_QUICK_PASTE_KEEP_OPEN` and defaults to `false`. Only a Boolean is
+  stored; **no query, clip text, or clipboard content is persisted**.
+- Esc, Close and the normal Main Vault routing still close QuickPaste.
+- `QuickPasteActivity.onStop()` from PR #16 retains DeX window geometry while
+  calling `viewModel.clear()`, wiping queries/decrypted result records
+  immediately when hidden. Existing Vault lock, device screen-off and
+  `BiometricPrompt` rules are unchanged.
+- Clipboard remains Android's ordinary sensitive clipboard; each copy
+  replaces the previous value. The keep-open flag does not prevent other
+  apps with clipboard privileges from observing a copied value.
 
-Opt-in, **OFF by default**: `Keep QuickPaste open after copy`.
+## Verification
 
-- When off: retain exact existing Enter/tap → sensitive clipboard → close.
-- When on: Enter/tap copies the selected clip (with the existing sensitive
-  clipboard hint) and shows a confirmation, but leaves the QuickPaste Activity
-  open for another search/selection. Esc and Close explicitly exit.
-- Changing focus to another app can put an ordinary Activity behind it. **This
-  is not Always on Top** and must not be labelled/presented as pinned.
-- Prioritize keyboard UX: no automatic paste, the user controls what app gets
-  `Ctrl+V`. Repeated copy overwrites the system clipboard as usual.
-- If the app stops/minimizes, drop decrypted result list/query immediately.
-  If the Vault locks, enforce the existing BIOMETRIC_STRONG/CryptoObject gate,
-  whether or not the panel is configured to remain after copy.
-- Validate with Compose/instrumentation tests and DeX mouse/keyboard tests.
-
-### WP-06P-B — Actual 'always above other app windows'
-
-An ordinary Android `Activity` does not expose a supported always-on-top
-flag analogous to Windows' topmost window feature. Samsung One UI 8 DeX may
-also no longer present classic DeX's native pin-on-top option (community
-reports; **check the actual target device and OS build first**).
-
-The standard Android avenue is a `WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY`
-window, which uses a distinct, user-granted **SYSTEM_ALERT_WINDOW** / 'Appear
-on top' special permission. Overlay windows are drawn above regular
-application windows but below important system windows, including IME/status
-bar. **Do not silently add this permission in WP-06S or WP-06P-A**.
-
-Before any implementation:
-- Check native DeX window chrome and Good Lock/MultiStar settings on the
-  S23 Ultra for a trustworthy zero-permission option. 'Pin options menu'
-  is **not** 'keep the whole window always above other apps'.
-- Verify a window overlay can be rendered above other apps on the correct
-  DeX external display, with secure handling of lockscreen/multiple displays,
-  focus, input methods and user-initiated disable/revocation.
-- Resolve the focus contradiction: typing into QuickPaste's search requires
-  keyboard focus in the panel, while copying into another app requires focus
-  in that app. An overlay can be topmost yet interfere with text input unless
-  carefully designed.
-- Threat-model overlay tapjacking, obscured touches, screen-capture protection,
-  sensitive content visibility, process restart, vault lock, auto-lock, and
-  device screen-off. Keep explicit close, no raw key collection, no Accessibility,
-  no root, no network permission, no generalized Shizuku input hook.
-- Require a security review and explicit opt-in *before* shipping such a
-  privileged UI. Design a downgrade/fallback if permission is revoked.
-
-## Acceptance / test matrix
-
-| ID | Criterion | State |
+| Test | Expected | Status |
 |---|---|---|
-| P01 | Default single copy still closes QuickPaste | BASELINE PASS |
-| P02 | Opt-in multiple successive copies without reopening | NOT IMPLEMENTED |
-| P03 | Locked/background QuickPaste never retains decrypted list or bypasses biometrics | DESIGN GATE |
-| P04 | True overlay remains visually above other windows after target app takes focus | POC PENDING |
-| P05 | QuickPaste search focus and target app Ctrl+V operate deliberately without key interception | POC PENDING |
-| P06 | Additional overlay permission only with informed user opt-in; revocation/rollback works | POC PENDING |
-| P07 | One UI 8 DeX keyboard launcher alias/Main Vault icon unaffected | REGRESSION GATE |
-| P08 | Resized window size persists on minimize and full close | DEVICE PASS in WP-06S |
-| P09 | User opted to SKIP Windows remote-control modifier-compatibility gate | SKIPPED, NOT PASS |
+| P01 | New/previous user defaults to OFF and copy closes | Unit test; DeX pending |
+| P02 | Toggle ON and consecutive Enter/click copies keep QuickPaste open | Unit/Compose coverage; DeX pending |
+| P03 | Toggle OFF while open restores copy-and-close | Unit/Compose coverage; DeX pending |
+| P04 | 240×260dp window still exposes a toggle, search and first result | Responsive layout fix committed; CI pending |
+| P05 | Esc/Close explicitly closes regardless of toggle | Prior behavior; DeX regression pending |
+| P06 | Minimize/background wipes all decrypted search state | WP-06S instrumentation; regression pending |
+| P07 | Locked vault cannot copy without strong biometric authentication | WP-06S device evidence; regression pending |
+| P08 | Preference survives closing and reopening the Activity | Implementation; DeX pending |
+| P09 | No overlay/Accessibility/root/INTERNET permissions added | Manifest review pending |
+| P10 | Existing DeX shortcut and Main Vault icon continue to work | WP-06S device evidence; regression pending |
 
-## Recommended implementation order
+Automated checks:
+- `QuickPasteCopyPolicyTest`: default close vs user opt-in keep-open.
+- `QuickPasteCompactLayoutTest`: toggle visible/toggles within 240×260dp.
+- Existing `QuickPasteActivityInstrumentedTest`: minimized task retained,
+  sanitized query/results, and `FLAG_SECURE`.
 
-1. Finalize WP-06S CI/security review separately; retain current copy-close
-   default and do not fold unrelated privileges into PR #16.
-2. Build WP-06P-A as a new, independently reviewable PR with an opt-in
-   keep-after-copy setting. This addresses repeated Ditto-style clipboard use
-   but **not true always-on-top**.
-3. Investigate WP-06P-B with a permission/security/DeX-display PoC and only
-   implement if results justify the extra special permission.
+## Real-device test (do not clear personal Vault data)
 
-Sources:
-- Android SYSTEM_ALERT_WINDOW: https://developer.android.com/reference/android/Manifest.permission#SYSTEM_ALERT_WINDOW
-- Android WindowManager TYPE_APPLICATION_OVERLAY: https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_APPLICATION_OVERLAY
-- Samsung official DeX windowing: https://www.samsung.com/us/support/answer/ANS10002880/
-- Samsung DeX pin-top removal reports (not official API contract): https://r1.community.samsung.com/t5/samsung-dex/no-more-pinning-apps-on-top/m-p/35964441/highlight/true
-- WP-06S current research and implementation: `docs/WP06S_GLOBAL_SHORTCUT_POC.md`
+After CI passes, check out the stacked branch, build and update *in place*:
+
+```powershell
+git fetch origin
+git switch feature/wp06p-keep-open-after-copy
+git pull --ff-only origin feature/wp06p-keep-open-after-copy
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-debug.ps1
+```
+
+1. With **Keep open after copy** OFF, select and copy one result:
+   QuickPaste closes as before.
+2. Reopen via the Samsung DeX shortcut; turn **Keep open after copy** ON.
+3. Copy a result using Enter, then another result via mouse click; verify
+   QuickPaste remains open and clipboard changes to the last selected result.
+4. Explicitly press Esc. Reopen and verify the keep-open option is still ON.
+5. Verify minimizing hides decrypted queries/results and returning while
+   locked requires strong biometrics; no sensitive data must appear early.
+6. Confirm the resized window remains usable and no extra special permission
+   is prompted.
+
+**Do not** run `connectedDebugAndroidTest`, uninstall or `pm clear`
+against the personal-Vault device: instrumentation uses a disposable CI
+emulator; uninstall/clear can destroy encrypted Vault data/Keystore state.
+
+## Device report and CI regression correction (2026-10-28)
+
+**User's device result:** On the Samsung DeX real device, **all user-requested
+behaviors worked as expected**: opt-in copying without closing, normal default
+copy-and-close, and the existing QuickPaste flow. This is an observed UX PASS
+on the tested configuration, not a claim of universal compatibility.
+
+**CI review:** run #66 `verify` passed but `instrumentation` failed only
+`QuickPasteCompactLayoutTest.keepOpenSettingTogglesWithinTheMinimumWindow`:
+the footer `FilterChip` was off-screen in the synthetic 240×260dp panel.
+This exposed a real small-viewport affordance concern even though the user's
+larger window worked normally. Fixed in commit `480a25f`: on short windows
+(height ≤320dp), the switch is an accessible `IconToggleButton` integrated
+into the search field; on normal windows, preserve the user-tested footer chip.
+This is **not** an always-on-top function and adds no permission. CI #67 must
+confirm the minimum-size regression test before merging.
+
+PR #17 remains Draft and stacked on PR #16. Do not merge until CI passes.
+
+## Real device report: bottom toggle persists at minimum size (2026-10-28)
+
+The user reported the keep-open toggle **still appearing in the bottom
+footer instead of the right side of the search box** when the DeX window
+was minimized to its smallest size. The current installed APK revision was
+not independently identified, so both an older build and the height-only
+layout branch are viable explanations. The prior code switched to the
+search trailing slot only if `BoxWithConstraints.maxHeight <= 320.dp`, which
+may not hold in Samsung's actual Activity content coordinates.
+
+**Fix:** detect either small width (≤480dp) or small height (≤420dp), replace
+rather than add to the search icon space, and keep only a compact key hint
+below the list. Add tests for 240×260dp, narrow-but-tall 420×620dp, and
+regular 560×620dp windows. Distinct Compose semantics tags confirm the icon
+exists and the footer chip does *not* exist in compact layouts; normal mode
+keeps the user-tested footer chip.
+
+**CI history:** run #68 had `verify` PASS and one instrumentation FAIL
+(`QuickPasteCompactLayoutTest.searchListHintAndKeysFitTheMinimumWindow`),
+where item 4 was not visible at 240×260dp after adding an extra search-field
+icon. Compact mode now **replaces** the leading search icon with the toggle,
+so the text field retains its original icon-space footprint.
+
+Do not mark this layout correction PASS until both the new CI and target
+Samsung DeX device re-test. Update debug APK *in place*, without clearing
+Vault data, and verify the installed version is built from this PR's latest
+head commit.
+
+## Compact control icon preference and device verification (2026-10-28)
+
+The user confirmed on the real Samsung DeX device that the **compact-layout
+toggle now appears at the right of the search box**, and the keep-open
+functionality continues to work as expected (**device PASS** for layout and
+behavior). The user prefers a **lock icon** over the previous copy icon.
+
+UI-only follow-up: the compact toggle displays an **open lock when OFF** and
+a **closed lock when ON**. On/off tint and checked semantics follow the
+existing `keepOpenAfterCopy` Boolean. The accessible label remains
+**Keep open after copy**, NOT **Lock Vault**; this option only controls
+whether copying closes QuickPaste. Vault authentication, actual locking
+and background content clearing remain unchanged. Normal windows retain
+the labeled footer chip. No new permission or Always on Top behavior.
+
+The icon change was committed *after* the user's functional device test.
+Verify the new icons on an updated APK before marking this visual mapping
+PASS. PR #17 remains Draft and stacked on PR #16 pending CI/final review.

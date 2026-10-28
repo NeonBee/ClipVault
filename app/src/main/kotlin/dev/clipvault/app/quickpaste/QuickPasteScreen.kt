@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -26,10 +27,13 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -65,6 +69,8 @@ object QuickPasteTags {
     const val ROOT = "quick_paste_root"
     const val SEARCH = "quick_paste_search"
     const val LIST = "quick_paste_list"
+    const val KEEP_OPEN = "quick_paste_keep_open"
+    const val KEEP_OPEN_FOOTER = "quick_paste_keep_open_footer"
     fun row(index: Int) = "quick_paste_row_$index"
 }
 
@@ -79,6 +85,8 @@ fun QuickPasteScreen(
     onClose: () -> Unit,
     onUnlock: () -> Unit,
     onOpenApp: () -> Unit,
+    keepOpenAfterCopy: Boolean,
+    onKeepOpenChange: (Boolean) -> Unit,
 ) {
     // The root is focusable so Esc (and Enter on the lock pane) reach the key handler even when no
     // field or button holds focus; clickable buttons are not focusable in touch mode.
@@ -87,7 +95,11 @@ fun QuickPasteScreen(
         if (state.gate != QuickPasteGate.READY) runCatching { rootFocus.requestFocus() }
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
+        BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
+            // DeX's externally reported minimum window dimensions can differ from the
+            // Activity content area in dp. Use both axes: even a tall, narrow window needs
+            // the toggle inside the search field rather than below the scrollable clip list.
+            val compactLayout = maxWidth <= 480.dp || maxHeight <= 420.dp
             Column(
                 Modifier.widthIn(max = 640.dp).fillMaxSize().padding(16.dp)
                     // Preview runs parent-first, before the focused field or button: Esc always closes,
@@ -118,7 +130,10 @@ fun QuickPasteScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 when (state.gate) {
-                    QuickPasteGate.READY -> SearchPane(state, onQueryChange, onSelectIndex, onConfirm)
+                    QuickPasteGate.READY -> SearchPane(
+                        state, onQueryChange, onSelectIndex, onConfirm,
+                        keepOpenAfterCopy, onKeepOpenChange, compactLayout,
+                    )
                     QuickPasteGate.UNLOCKING -> StatusPane(stringResource(R.string.quick_paste_unlocking), null) {
                         CircularProgressIndicator(Modifier.size(32.dp))
                     }
@@ -149,12 +164,16 @@ fun QuickPasteScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColumnScope.SearchPane(
     state: QuickPasteState,
     onQueryChange: (String) -> Unit,
     onSelectIndex: (Int) -> Unit,
     onConfirm: () -> Unit,
+    keepOpenAfterCopy: Boolean,
+    onKeepOpenChange: (Boolean) -> Unit,
+    compactLayout: Boolean,
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -166,7 +185,30 @@ private fun ColumnScope.SearchPane(
         value = state.query,
         onValueChange = onQueryChange,
         singleLine = true,
-        leadingIcon = { Icon(Icons.Default.Search, null) },
+        // Replace, rather than add to, the search icon slot in the compact layout.
+        // Keeping only one 48dp icon leaves as much room for the text field as before
+        // and avoids making the field taller or the list too short at 240x260dp.
+        leadingIcon = if (compactLayout) null else {
+            { Icon(Icons.Default.Search, null) }
+        },
+        trailingIcon = if (compactLayout) {
+            {
+                IconToggleButton(
+                    checked = keepOpenAfterCopy,
+                    onCheckedChange = onKeepOpenChange,
+                    modifier = Modifier.testTag(QuickPasteTags.KEEP_OPEN),
+                ) {
+                    Icon(
+                        // The lock refers to retaining this panel, NOT locking/unlocking the vault.
+                        // Keep the accessible label tied to the actual copy-then-close policy.
+                        if (keepOpenAfterCopy) Icons.Default.Lock else Icons.Default.LockOpen,
+                        contentDescription = stringResource(R.string.quick_paste_keep_open),
+                        tint = if (keepOpenAfterCopy) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        } else null,
         placeholder = { Text(stringResource(R.string.quick_paste_search_hint)) },
         keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Go),
         keyboardActions = KeyboardActions(onGo = { onConfirm() }),
@@ -193,8 +235,25 @@ private fun ColumnScope.SearchPane(
             }
         }
     }
-    Text(stringResource(R.string.quick_paste_keys_hint), style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (compactLayout) {
+        Text(stringResource(R.string.quick_paste_keys_hint),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        // Retain the labeled footer chip on normal-sized windows, where it was device-tested.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            Text(stringResource(R.string.quick_paste_keys_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FilterChip(
+                selected = keepOpenAfterCopy,
+                onClick = { onKeepOpenChange(!keepOpenAfterCopy) },
+                label = { Text(stringResource(R.string.quick_paste_keep_open)) },
+                modifier = Modifier.testTag(QuickPasteTags.KEEP_OPEN_FOOTER),
+            )
+        }
+    }
 }
 
 @Composable

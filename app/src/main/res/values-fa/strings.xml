@@ -72,6 +72,7 @@
     <string name="quick_paste_close">بستن</string>
     <string name="quick_paste_empty">هنوز کلیپی نیست</string>
     <string name="quick_paste_no_match">کلیپی پیدا نشد</string>
+    <string name="quick_paste_keep_open">بعد از کپی باز بماند</string>
     <string name="quick_paste_keys_hint">↑↓ انتخاب · Enter کپی · Esc بستن</string>
     <string name="unlock_interrupted">خزانه هنگام باز شدن قفل شد. دوباره احراز هویت کنید.</string>
     <string name="recent_locks">قفل‌های اخیر</string>
