@@ -78,8 +78,8 @@ PR #15 검증 전에는 기본 명령으로 한 번 빌드해야 최신 코드�
 420dp는 앱 내부 사용 가능 높이이므로 DeX 창 테두리 바깥 치수와 다를 수 있다.
 Main Vault의 freeform 최소 크기(320×384dp), QuickPaste 최소 크기(240×260dp)도 유지되는지 확인한다.
 
-QuickPaste는 `exported=false` Activity이므로 직접 `adb shell am start`로 시작하는 방식에 의존하지 않는다.
-앱 아이콘이나 DeX 작업표시줄 아이콘을 길게 눌러 **Quick paste** 단축키로 연다.
+QuickPaste 본체는 여전히 `exported=false` Activity이므로 외부에서 본체를 직접 `adb shell am start`하는 방식에 의존하지 않는다.
+앱/DeX 작업표시줄 아이콘 길게 누르기 → **Quick paste**를 사용하거나, 사용자 opt-in 설정으로 활성화한 **QuickPasteLauncherAlias**에 삼성 물리 키보드 앱 단축키를 등록한다. 이 alias는 `exported=true`이지만 Vault 잠금을 우회하지 않는다. 현재 상태는 [WP-06 완료 검증표](WP06_COMPLETION.md) 참조.
 
 검증 결과는 `docs/WP06_DEX_UX.md`의 3단계 체크리스트에 PASS/PARTIAL/FAIL로 기록한다.
 세션 관련 진단은 기존 `scripts/device-validation-record.ps1`을 사용한다.
