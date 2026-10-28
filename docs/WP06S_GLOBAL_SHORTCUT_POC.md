@@ -1,6 +1,8 @@
 # WP-06S — Samsung DeX QuickPaste launcher alias PoC
 
-Status: **implementation PR / real-device validation PENDING** (2026-10-27).
+**최종 상태 (2026-10-28): PR [#16](https://github.com/NeonBee/ClipVault/pull/16) `hardening/base` 병합 완료 (`edcf79c`), S23 Ultra / One UI 8 DeX 실기기에서 삼성 앱 단축키 → QuickPaste, Main 아이콘 유지, OFF/ON 전환, 최소화·완전 종료 후 창 크기 복원 및 인증 경계 관측 PASS.** [최종 검증표](WP06_COMPLETION.md).
+
+> 아래 내용은 최초 PoC부터 실패·원복·실기기 재검증까지의 **시점별 실험 기록**이다. 앞부분의 `FAIL`·`PENDING`·`before merge` 문장은 이후 수정 전 당시 상태를 기술한 것이며 최종 PR 상태가 아니다. Samsung의 내부 단축키 API와 다른 OS 빌드 호환성은 입증하지 않았다. Windows 원격제어 Ctrl/Cmd 검증은 사용자가 **SKIP**한 항목이며 PASS가 아니다.
 
 This is a **WP-06 follow-up**, not WP-07. WP-07 is reserved for the separate secure
 copy / retrieval-only IME plan (`WP07_SECURE_TEXT_BOUNDARY.md`).
@@ -169,7 +171,7 @@ CI history: Android run #46 `instrumentation` PASS / `verify` FAIL on six Persia
 
 ## CATEGORY_INFO priority experiment (PR #16 follow-up, 2026-10-28)
 
-**Status: CODE IMPLEMENTED / CI run #55 PASS / S23 Ultra + One UI 8 DeX field test PASS (2026-10-28). Wider-device compatibility, lock-state and remote Windows modifiers remain pending.**
+**Historical experiment checkpoint (superseded by merged PR #16 and completion matrix): code implemented, CI #55 PASS, target device shortcut PASS. See the final status at the beginning of this document.**
 
 The Android SDK documents that `PackageManager.getLaunchIntentForPackage(packageName)`
 finds the first matching `ACTION_MAIN + CATEGORY_INFO` entry, then searches
