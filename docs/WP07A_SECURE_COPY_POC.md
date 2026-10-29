@@ -9,7 +9,7 @@
 | 경로 | 현재 계약 |
 | --- | --- |
 | `ACTION_PROCESS_TEXT` / `text/plain` | **새 exported SecureCopyActivity**에서만 수신. 원래 MainActivity의 PROCESS_TEXT 필터/처리 제거 |
-| Selection payload | `Intent.EXTRA_PROCESS_TEXT` 문자열만 허용; 공백만 있거나 누락/지나치게 큰 입력은 거절 (상한 128,000 UTF-16 코드 유닛). 사용자가 선택한 문자열의 공백/개행은 의도적으로 유지 |
+| Selection payload | `Intent.EXTRA_PROCESS_TEXT` 문자열만 허용; 공백만 있거나 누락/지나치게 큰 입력은 거절 (상한 128,000 UTF-16 코드 유닛). Intent 수신 단계에서 사용자가 선택한 공백·개행을 임의로 잘라내지 않음. **단, 실제 SQLCipher 저장 시 기존 `NativeClassifier.analyze()`의 정규화(양끝 공백 제거, 연속 개행 정리)가 적용됨** — 완전한 원문 바이트 동일성은 이번 PoC의 보장 범위 밖 |
 | 인증 | 사용자가 'Save securely'를 누른 후, 잠긴 Vault는 기존 `BiometricVaultUnlock` + `CryptoObject`를 이용해 Strong biometric로 열어야 저장 가능. 새 Vault 등록은 메인 앱에서만 허용 |
 | 저장 | `ClipVaultApp.saveExplicitSecureText()` → `VaultRepository.insert()` → SQLCipher; 동일 IO executor와 lock epoch 내 인증/잠금 상태 확인 |
 | 실패/취소 | 저장 없이 종료 또는 오류. **일반 capture / PendingStore / ClipboardManager / ACTION_SEND fallback 없음** |
