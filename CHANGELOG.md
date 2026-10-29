@@ -2,6 +2,8 @@
 
 ## Unreleased (DeX fork hardening)
 
+- **WP-07A Secure Copy PoC (under review, not yet verified for release):** route explicit `ACTION_PROCESS_TEXT`/plain text selection to a dedicated secure-ingress Activity with confirmation and existing strong biometric vault unlock. Store directly into SQLCipher on the serialized IO executor with a lock-epoch guard; do not use system clipboard writes, background capture/staging, or automatic fallback. Remove the old `PROCESS_TEXT` entry from MainActivity while preserving normal `ACTION_SEND`. CI and Samsung cross-app/no-clipboard manual gates are pending. See [WP-07A validation](docs/WP07A_SECURE_COPY_POC.md).
+
 - Pinned the audit baseline at upstream `ee1f24af3010dd26be7d95545ea9dbf0fd703622` (ClipVault 2.0.0).
 - Updated SQLCipher Android from 4.17.0 to 4.19.0 stable and AndroidX SQLite from 2.6.2 to 2.7.1, matching the SQLCipher 4.19 integration guide (2.7.0+).
 - Moved the vault to schema v3: FTS5 `secure-delete` is enabled, v2 indexes are rebuilt, and a busy-aware `wal_checkpoint(TRUNCATE)` runs after migration, hard delete, Trash purge, edit and replace-restore (deferred to commit inside transactions) so deleted clips leave no terms in FTS shadow tables or the WAL. Added forensic deletion instrumentation tests.
