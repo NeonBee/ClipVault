@@ -79,4 +79,13 @@
     <string name="lock_at">قفل %1$s</string>
     <string name="search">جستجو</string>
     <string name="close_search">بستن جستجو</string>
+    <!-- WP-07A secure selection/share ingress, same security semantics in both entry points. -->
+    <string name="secure_copy_title">ذخیرهٔ امن در ClipVault</string>
+    <string name="secure_copy_share_title">ذخیرهٔ امن در ClipVault</string>
+    <string name="secure_copy_explanation">متن انتخاب‌شده یا به‌اشتراک‌گذاشته‌شده را بدون کپی کردن در کلیپ‌بورد اندروید، مستقیم در خزانهٔ رمزگذاری‌شده ذخیره کنید. در صورت نیاز احراز هویت بیومتریک قوی انجام دهید.</string>
+    <string name="secure_copy_save">ذخیرهٔ امن</string>
+    <string name="secure_copy_working">در حال احراز هویت یا ذخیره…</string>
+    <string name="secure_copy_invalid">متن معتبری دریافت نشد. هیچ‌چیز ذخیره نشد.</string>
+    <string name="secure_copy_failed">ذخیرهٔ امن انجام نشد. از کلیپ‌بورد به‌عنوان مسیر جایگزین استفاده نشد.</string>
+    <string name="secure_copy_saved">در خزانهٔ رمزگذاری‌شده ذخیره شد</string>
 </resources>
