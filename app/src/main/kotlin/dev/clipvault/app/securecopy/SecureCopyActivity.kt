@@ -32,7 +32,7 @@ import dev.clipvault.app.security.VaultKeyManager
 import dev.clipvault.app.security.VaultLockLog
 
 /**
- * User-invoked text-selection ingress. No payload preview, clipboard write, pending-store fallback,
+ * User-invoked text-selection or text-share ingress. No payload preview, clipboard write, pending-store fallback,
  * sensitive-content toast, notification, search history or intent re-use.
  *
  * The incoming text must remain in process RAM only until the user confirms/cancels. Strings cannot
@@ -60,9 +60,10 @@ class SecureCopyActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
         app = application as ClipVaultApp
         // Never restore selection text from a saved instance state after process death/rotation.
-        selectedText = if (savedInstanceState == null) SecureCopyRequest.selectedText(intent) else null
+        selectedText = if (savedInstanceState == null) SecureCopyRequest.incomingText(intent) else null
         status = if (selectedText == null) Status.INVALID else Status.READY
         intent?.removeExtra(android.content.Intent.EXTRA_PROCESS_TEXT)
+        intent?.removeExtra(android.content.Intent.EXTRA_TEXT)
         setIntent(android.content.Intent())
         unlocker = BiometricVaultUnlock(this, app, VaultKeyManager(this), unlockListener)
         app.addLockListener(lockListener)
