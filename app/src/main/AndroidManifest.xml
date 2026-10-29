@@ -58,6 +58,7 @@
              a silent pending-staging write. FLAG_SECURE/no-recents are set at runtime. -->
         <activity
             android:name=".securecopy.SecureCopyActivity"
+            android:label="@string/secure_copy_title"
             android:exported="true"
             android:excludeFromRecents="true"
             android:autoRemoveFromRecents="true"
