@@ -31,6 +31,24 @@
 
 **릴리스 금지 조건:** 위 Samsung clipboard non-interference 게이트를 통과하기 전까지 'Secure Copy bypasses the system clipboard'라는 사용자 대상 보안 주장을 완료로 표기하지 않는다. 다음 WP-07B Secure Paste는 별도 구현/리뷰다.
 
+## Samsung DeX / One UI 8.0 selection-toolbar 실기기 관측 (2026-10-29)
+
+**환경:** Galaxy S23 Ultra / One UI 8.0, WP-07A PR #19 debug APK, owner profile. 사용자 스크린샷 및 직접 조작 결과 기록.
+
+| 진입점 | PROCESS_TEXT 선택 메뉴에 독립 'Secure Copy to ClipVault' 항목 | Secure Save 실행 및 Vault 저장 |
+| --- | --- | --- |
+| ChatGPT 앱 내부 텍스트 선택/우클릭 | **PASS** — 실제 메뉴에 독립 항목 표시 | **PASS** — 직접 선택 후 저장 성공 |
+| 삼성 인터넷 텍스트 선택 | **FAIL** — 일반 메뉴에 독립 항목 미표시 | 해당 메뉴에서 직접 테스트 불가 |
+| Obsidian 텍스트 선택 | **FAIL** — 일반 메뉴에 독립 항목 미표시 | 해당 메뉴에서 직접 테스트 불가 |
+| 삼성 선택 메뉴의 **사전** → Android 앱 선택기 → ClipVault | 사전 경유로 ClipVault 표시 | **PASS** — 선택 텍스트가 Vault에 저장됨 |
+| ADB `cmd package query-activities -a android.intent.action.PROCESS_TEXT -t text/plain` | **PASS** — `dev.clipvault.app.debug/dev.clipvault.app.securecopy.SecureCopyActivity` 검색됨 | 컴포넌트 직접 실행 확인 |
+
+**One UI 앱 관리 검증:** 삼성 설정의 선택 메뉴 앱 관리 화면에 ClipVault가 표시되고 유일한 활성 앱으로 ON이지만, 삼성 인터넷/Obsidian 선택 메뉴의 독립 항목은 계속 미표시. ADB `settings get global process_text_manager_apps`에도 `dev.clipvault.app.securecopy.SecureCopyActivity#`가 반영됐지만 결과는 동일했다.
+
+**해석:** Android가 PROCESS_TEXT를 해결할 수 있고 **적어도 ChatGPT 앱은 호출 가능한 선택 메뉴 항목을 구성**한다. 반면 삼성 인터넷/Obsidian에서의 UI 노출은 미지원/호출 앱별 필터링 또는 메뉴 구현 차이로 보인다. **One UI 전체가 PROCESS_TEXT를 차단한다거나, 삼성용 허용 목록만 수정하면 해결된다고 주장하지 않는다.** 정확한 메뉴 구현·패키지 가시성 원인은 아직 확정하지 않았다.
+
+**기능 검증과 보안 검증 분리:** ClipboardManager에 새 clip이 올라가지 않았는지, 삼성 키보드 히스토리에 잔류하는지, 잠금·취소·에지 케이스가 fail-closed인지 각각 별도로 검증해야 한다. **일반 ACTION_SEND는 지금도 일반 capture/pending 경로이므로 아직 Secure Copy 호환 fallback이 아니다.**
+
 ## Windows 데이터 보존형 설치
 
 ```powershell
