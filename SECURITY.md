@@ -32,7 +32,7 @@ There is intentionally no recovery key, server escrow or bypass. Losing or inval
 - Likely OTP, password/token phrases and payment numbers are skipped by default.
 - Lock diagnostics keep only reason codes, timestamps and device-state flags for the last 8 locks; no clipboard content, search text or key material. Samsung DeX detection is used for diagnostics only and never as an authentication factor.
 
-## Planned secure text path
+## Secure text roadmap (WP-07A PoC; WP-07B planned)
 
 WP-07 defines an optional path for sensitive text that avoids the Android/system clipboard in both directions:
 
@@ -41,7 +41,7 @@ WP-07 defines an optional path for sensitive text that avoids the Android/system
 
 This path is intentionally designed without Accessibility Service, Samsung Keyboard hooks, arbitrary UI injection or a new network boundary. Samsung Keyboard remains the normal primary IME; ClipVault's planned IME is an on-demand retrieval surface only.
 
-WP-07 is a **planned design, not a current release guarantee**. Until its clipboard non-interference tests pass, users must assume that the existing normal Copy/QuickPaste restore path exposes plaintext to the system clipboard.
+WP-07A has a **draft PoC implementation** of a separately confirmed `ACTION_PROCESS_TEXT` ingress Activity which writes only to an unlocked SQLCipher vault; it does not use the background clipboard capture or pending staging path. The app does not yet claim this path is independently proven private on Samsung/other ROMs: the on-device clipboard non-interference and cross-app compatibility matrix remain **pending**. WP-07B Secure Paste/IME is not implemented. The existing normal Copy/QuickPaste restore path still exposes plaintext to the system clipboard.
 
 See [docs/WP07_SECURE_TEXT_BOUNDARY.md](docs/WP07_SECURE_TEXT_BOUNDARY.md), [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md), and the [WP-06 implementation/verification boundary](docs/WP06_COMPLETION.md).
 
