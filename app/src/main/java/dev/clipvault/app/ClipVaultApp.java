@@ -355,6 +355,28 @@ public final class ClipVaultApp extends Application {
         }
     }
 
+    /**
+     * WP-07A: explicit user-selected text ingress, never the background capture/staging path.
+     * Caller MUST run on the app's serialized IO executor, after the user confirms the action.
+     * No sensitive-text skip heuristic is applied to a deliberate explicit secure save.
+     *
+     * Lock epoch and SQLCipher insertion are guarded together so no insert starts after lockVault().
+     * No raw text appears in notifications, preferences, capture diagnostics or clipboard events.
+     */
+    public boolean saveExplicitSecureText(@NonNull String rawText, long expectedLockEpoch) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            throw new IllegalStateException("Secure text storage must run off the main thread");
+        }
+        if (rawText.isBlank() || rawText.length() > 128_000) return false;
+        boolean inserted;
+        synchronized (lockEpoch) {
+            if (!unlocked || lockEpoch.get() != expectedLockEpoch || repository == null) return false;
+            inserted = repository.insert(rawText, System.currentTimeMillis()) > 0;
+        }
+        if (inserted) notifyDataChanged();
+        return inserted;
+    }
+
     public void capture(@NonNull String rawText, long createdAt) {
         TextAnalysis analysis = NativeClassifier.analyze(rawText);
         if (analysis.normalized.isEmpty()) return;
