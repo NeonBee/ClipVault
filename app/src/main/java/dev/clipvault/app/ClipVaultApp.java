@@ -367,7 +367,7 @@ public final class ClipVaultApp extends Application {
         if (Looper.myLooper() == Looper.getMainLooper()) {
             throw new IllegalStateException("Secure text storage must run off the main thread");
         }
-        if (rawText.isBlank() || rawText.length() > 128_000) return false;
+        if (rawText.trim().isEmpty() || rawText.length() > 128_000) return false;
         boolean inserted;
         synchronized (lockEpoch) {
             if (!unlocked || lockEpoch.get() != expectedLockEpoch || repository == null) return false;
