@@ -53,9 +53,12 @@
                 android:minWidth="320dp" />
         </activity>
 
-        <!-- WP-07A: explicit selection-toolbar ingress. This exported component accepts only
-             ACTION_PROCESS_TEXT text/plain, never clipboard read, SEND, arbitrary extras or
-             a silent pending-staging write. FLAG_SECURE/no-recents are set at runtime. -->
+        <!-- WP-07A: user-confirmed encrypted ingress for two explicit source integrations.
+             PROCESS_TEXT: selection toolbar on supporting apps.
+             SEND: distinct "Secure Copy to ClipVault" share-sheet target (not Main's legacy
+             "ClipVault" share receiver, which continues to use normal capture/staging).
+             Both require foreground confirmation and existing strong-biometric Vault unlock.
+             No system clipboard write, pending staging or automatic fallback. -->
         <activity
             android:name=".securecopy.SecureCopyActivity"
             android:label="@string/secure_copy_title"
@@ -65,6 +68,13 @@
             android:taskAffinity="${applicationId}.securecopy">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <!-- Separate from MainActivity's legacy ACTION_SEND target. A user must select
+                 this specifically labeled secure target; do not auto-route normal shares. -->
+            <intent-filter android:label="@string/secure_copy_share_title">
+                <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
