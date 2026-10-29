@@ -41,11 +41,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.PROCESS_TEXT" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
+
             <!-- Freeform (DeX) window floor only; phones ignore <layout>. Without it the main window
                  can be resized until the library shows filter chips but no clip, and until the four
                  top bar actions overflow. The floor is the smallest usable vault viewport: top bar
@@ -55,6 +51,22 @@
             <layout
                 android:minHeight="384dp"
                 android:minWidth="320dp" />
+        </activity>
+
+        <!-- WP-07A: explicit selection-toolbar ingress. This exported component accepts only
+             ACTION_PROCESS_TEXT text/plain, never clipboard read, SEND, arbitrary extras or
+             a silent pending-staging write. FLAG_SECURE/no-recents are set at runtime. -->
+        <activity
+            android:name=".securecopy.SecureCopyActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:autoRemoveFromRecents="true"
+            android:taskAffinity="${applicationId}.securecopy">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <!-- Unexported: reached only through ClipVault's own launcher shortcut. Separate task, no recents
