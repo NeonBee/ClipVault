@@ -123,6 +123,11 @@ class SecureCopyActivity : AppCompatActivity() {
         status = Status.SAVING
         acceptWrite = true
         val epoch = app.lockEpoch()
+        if (!SecureCopyGate.canCommit(app.isUnlocked, epoch, app.lockEpoch())) {
+            acceptWrite = false
+            status = Status.FAILED
+            return
+        }
         app.io().execute {
             // Single app-wide IO executor serializes this write with vault open/close. Never
             // call ClipVaultApp.capture(), which can write to staging even when locked.
