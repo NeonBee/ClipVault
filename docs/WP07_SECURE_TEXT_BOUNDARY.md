@@ -1,6 +1,6 @@
 # WP-07 Secure Text Boundary
 
-상태: **Decision / Planned — not implemented yet**
+상태: **WP-07A Secure Copy PoC implementation in progress (CI/실기기 검증 전); WP-07B~D 미구현.** [WP-07A 구현/검증 가이드](WP07A_SECURE_COPY_POC.md) 참조.
 
 이 문서는 ClipVault가 단순한 encrypted clipboard history를 넘어, 민감한 텍스트가 가능한 한 Android/System clipboard를 통과하지 않고 vault에 들어오고 나가도록 하는 보안 경계와 UX 방향을 고정한다.
 
@@ -260,7 +260,7 @@ Secure Copy 또는 Secure Paste 시 다음을 모두 확인해야 한다.
 
 ## 9. 현재 구현과의 관계
 
-이 문서는 **결정사항과 다음 구현 경계**를 정의한다. 작성 시점의 ClipVault는 아직 WP-07 Secure Copy/Secure Paste를 구현하지 않았다.
+이 문서는 **보안 설계와 미완료 보안 검증 게이트**를 정의한다. WP-07A Secure Copy PoC는 `feature/wp07a-secure-copy-poc` 구현 PR에서 검증 중이며, 실기기 clipboard non-interference를 확인하기 전까지 출시 수준의 보안 기능으로 주장하지 않는다. **WP-07B Secure Paste / IME는 아직 미구현이다.**
 
 현재 구현의 copy-back 경로는 계속 system clipboard를 사용하므로, 그 경로에 대해서는 "ClipVault encrypted storage에서 안전하게 보관된다"는 주장과 "clipboard로 내보낸 뒤에도 ClipVault가 기밀성을 보장한다"는 주장을 구분해야 한다.
 
