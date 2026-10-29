@@ -22,7 +22,7 @@ class SecureCopyIntentInstrumentedTest {
         }
 
     @Test fun acceptsExactSelectedTextIncludingKoreanAndLineBreaks() {
-        val content = "  한국어\\ncode = 123  "
+        val content = "  한국어\ncode = 123  "
         assertEquals(content, SecureCopyRequest.selectedText(request(content)))
     }
 
@@ -36,7 +36,7 @@ class SecureCopyIntentInstrumentedTest {
     }
 
     @Test fun rejectsBlankMissingAndOversizedPayload() {
-        assertNull(SecureCopyRequest.selectedText(request("  \\n  ")))
+        assertNull(SecureCopyRequest.selectedText(request("  \n  ")))
         assertNull(SecureCopyRequest.selectedText(Intent(Intent.ACTION_PROCESS_TEXT).setType("text/plain")))
         assertNull(SecureCopyRequest.selectedText(request("x".repeat(SecureCopyRequest.MAX_SELECTED_CHARS + 1))))
     }
