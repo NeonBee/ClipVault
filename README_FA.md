@@ -2,7 +2,7 @@
 
 ClipVault یک آرشیو آفلاین و رمزنگاری‌شده برای تاریخچهٔ کلیپ‌بورد اندروید است. متن‌ها از طریق یک پل محدود Shizuku دریافت می‌شوند، دیتابیس اصلی با SQLCipher رمز می‌شود و بازکردن کلید آن همیشه به احراز هویت بیومتریک قوی در Android Keystore وابسته است.
 
-[English](README.md) · [امنیت](SECURITY.md) · [معماری](docs/ARCHITECTURE.md) · [فرمت پشتیبان](docs/BACKUP_FORMAT.md)
+[English](README.md) · [امنیت](SECURITY.md) · [معماری](docs/ARCHITECTURE.md) · [گزارش نهایی DeX](docs/WP06_COMPLETION.md) · [فرمت پشتیبان](docs/BACKUP_FORMAT.md)
 
 ![سیستم تم ClipVault](docs/theme-preview.svg)
 
@@ -17,6 +17,7 @@ ClipVault یک آرشیو آفلاین و رمزنگاری‌شده برای ت�
 - خروجی و ورود فایل نسخه‌دار `.cvault` با Argon2id و AES-256-GCM
 - تم System، Light، Dark و AMOLED، رنگ پویای اندروید ۱۲ به بالا، شش پالت رنگ و پیش‌نمایش زنده
 - رابط کامل فارسی RTL و انگلیسی LTR
+- پنجرهٔ **QuickPaste** در Samsung DeX: میان‌بر اختیاری صفحه‌کلید سخت‌افزاری برای بازکردن مستقیم QuickPaste بدون تغییر آیکن اصلی ClipVault. در حالت پیش‌فرض، کپی‌کردن پنجره را می‌بندد؛ با فعال‌سازی گزینهٔ **Keep open after copy** می‌توان چند مورد را پشت سر هم کپی کرد. در پنجرهٔ کوچک، کلید قفل باز/بسته کنار کادر جست‌وجو فقط همین گزینه را کنترل می‌کند؛ به معنی قفل‌کردن خزانه نیست. این ویژگی «همیشه روی پنجره‌های دیگر» یا چسباندن خودکار نیست.
 
 برنامه مجوز `INTERNET`، آنالیتیکس، حساب کاربری، فضای ابری و telemetry ندارد.
 
@@ -24,11 +25,11 @@ ClipVault یک آرشیو آفلاین و رمزنگاری‌شده برای ت�
 
 ```mermaid
 flowchart LR
-    C[کلیپ‌بورد اندروید] --> S[Shizuku UserService v2]
+    C[کلیپ‌بورد اندروید] --> S[Shizuku UserService v3, shell only]
     S --> F[سرویس ثبت پس‌زمینه]
     F --> A[تحلیل متن C++]
     A --> L{خزانه باز است؟}
-    L -->|بله| D[SQLCipher v2 + FTS5]
+    L -->|بله| D[SQLCipher v3 + FTS5 secure-delete]
     L -->|خیر| P[صف AES-GCM]
     B[BiometricPrompt + CryptoObject] --> K[بازکردن کلید Keystore]
     K --> D
@@ -60,7 +61,7 @@ APK دیباگ در `app/build/outputs/apk/debug/app-debug.apk` ساخته می�
 ## راه‌اندازی گوشی
 
 1. یک اثر انگشت قوی در تنظیمات امنیتی گوشی ثبت کنید.
-2. [Shizuku](https://shizuku.rikka.app/guide/setup/) را با Wireless debugging، ADB یا root اجرا کنید.
+2. [Shizuku](https://shizuku.rikka.app/guide/setup/) را با Wireless debugging یا ADB در حالت کاربر shell اجرا کنید. ClipVault برای مرز امنیتی خود backendهای root/Sui را نمی‌پذیرد.
 3. APK را با دستور `adb install -r app/build/outputs/apk/debug/app-debug.apk` نصب کنید.
 4. ClipVault را باز و خزانهٔ بیومتریک را ایجاد کنید.
 5. مجوز Shizuku و اعلان را بدهید و ثبت را از تنظیمات یا Quick Settings فعال کنید.
@@ -74,5 +75,7 @@ APK دیباگ در `app/build/outputs/apk/debug/app-debug.apk` ساخته می�
 پیش از استفاده برای اطلاعات خیلی حساس، [SECURITY.md](SECURITY.md) و [مدل تهدید](docs/THREAT_MODEL.md) را بخوانید. این پروژه جایگزین password manager مستقل و ممیزی‌شده نیست.
 
 ## وضعیت
+
+قابلیت‌های DeX مربوط به WP-06، میان‌بر WP-06S و گزینهٔ حفظ پنجره بعد از کپی (WP-06P-A) در شاخهٔ `hardening/base` ادغام و روی Galaxy S23 Ultra با Android 16 / One UI 8 آزموده شده‌اند. آزمون CI نهایی [#79](https://github.com/NeonBee/ClipVault/actions/runs/40662764365) موفق بود. جزئیات و محدودیت‌ها در [گزارش تکمیل WP-06](docs/WP06_COMPLETION.md) ثبت شده‌اند. مسیر Secure Copy / Secure IME مربوط به WP-07 هنوز پیاده‌سازی نشده و کپی معمولی همچنان از کلیپ‌بورد سیستم عبور می‌کند.
 
 نسخهٔ `2.0.0` با API 37 build می‌شود و هر چهار ABI اندروید را می‌سازد. مجموعه‌تست دستگاهی آن تمام تم‌ها، ناوبری، انتخاب چندتایی، بازیابی سطل زباله، خطاهای بکاپ رمزنگاری‌شده، برابری تحلیلگر C++ و fallback، مهاجرت واقعی v1 به v2 و جست‌وجوی ایندکس‌شده میان ۲۰هزار کلیپ رمزنگاری‌شده را پوشش می‌دهد. تست‌های امنیت و داده و bind واقعی UserService پروتکل v2 به Shizuku روی یک گوشی Android 13 با HyperOS نیز پاس شده‌اند. رفتار کلیپ‌بورد Shizuku همچنان باید روی ROMهای واقعی بیشتری آزمایش شود.

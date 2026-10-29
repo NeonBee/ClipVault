@@ -1,9 +1,8 @@
 # WP-06P-A — Keep QuickPaste open after copy
 
-Status: **implementation / device validation pending** (2026-10-28).
-This is a *separate stacked PR* based on WP-06S PR #16
-(`feature/wp06s-quickpaste-launcher`). It should be rebased on
-`hardening/base` after PR #16 merges.
+**Final status (2026-10-28): merged in [PR #17](https://github.com/NeonBee/ClipVault/pull/17) (merge `81546b4`) to `hardening/base`; target Samsung DeX device behavior PASS and final [CI #79](https://github.com/NeonBee/ClipVault/actions/runs/40662764365) verify + instrumentation PASS.** See [WP-06 completion/evidence](WP06_COMPLETION.md).
+
+> This document includes **historical PoC and failed-CI investigation notes**. Any `pending`, `Draft`, or `before merge` wording in those later chronological sections describes the state *then*, not the current status. The feature remains opt-in; true Always on Top is **out of scope**.
 
 ## Scope and explicit exclusion
 
@@ -46,16 +45,16 @@ when another app takes focus. This option is not labelled "Always on Top".
 
 | Test | Expected | Status |
 |---|---|---|
-| P01 | New/previous user defaults to OFF and copy closes | Unit test; DeX pending |
-| P02 | Toggle ON and consecutive Enter/click copies keep QuickPaste open | Unit/Compose coverage; DeX pending |
-| P03 | Toggle OFF while open restores copy-and-close | Unit/Compose coverage; DeX pending |
-| P04 | 240×260dp window still exposes a toggle, search and first result | Responsive layout fix committed; CI pending |
-| P05 | Esc/Close explicitly closes regardless of toggle | Prior behavior; DeX regression pending |
-| P06 | Minimize/background wipes all decrypted search state | WP-06S instrumentation; regression pending |
-| P07 | Locked vault cannot copy without strong biometric authentication | WP-06S device evidence; regression pending |
-| P08 | Preference survives closing and reopening the Activity | Implementation; DeX pending |
-| P09 | No overlay/Accessibility/root/INTERNET permissions added | Manifest review pending |
-| P10 | Existing DeX shortcut and Main Vault icon continue to work | WP-06S device evidence; regression pending |
+| P01 | New/previous user defaults to OFF and copy closes | **PASS** — unit/CI #79 and user device verification |
+| P02 | Toggle ON and consecutive Enter/click copies keep QuickPaste open | **PASS** — user device verification; CI #79 |
+| P03 | Toggle OFF while open restores copy-and-close | **PASS** — user device verification; CI #79 |
+| P04 | 240×260dp window still exposes a toggle, search and first result | **PASS** — compact toggle device verification; CI #79 |
+| P05 | Esc/Close explicitly closes regardless of toggle | Prior behavior retained; CI #79; no separately reported exhaustive device edge-case matrix |
+| P06 | Minimize/background wipes all decrypted search state | **PASS** — WP-06S instrumentation and target-device no-auth-bypass observation; not an independent security audit |
+| P07 | Locked vault cannot copy without strong biometric authentication | **PASS (observed scope)** — existing biometric gate and no device bypass observed |
+| P08 | Preference survives closing and reopening the Activity | Implemented as app-private Boolean preference; exact reboot/power-loss matrix not separately documented |
+| P09 | No overlay/Accessibility/root/INTERNET permissions added | **PASS** — PR diff/manifest/CI permission checks |
+| P10 | Existing DeX shortcut and Main Vault icon continue to work | **PASS** — target-device routing verification |
 
 Automated checks:
 - `QuickPasteCopyPolicyTest`: default close vs user opt-in keep-open.

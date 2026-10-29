@@ -1,5 +1,8 @@
 # ClipVault DeX/Ditto Fork — 코드 감사 결과 및 설계서
 
+> **문서 시점 주의 (2026-10-28):** 본 문서는 최초 포크 감사·구현 로드맵의 역사적 기록이다. WP-01~06의 주요 구현과 WP-06S(DeX 단축키)·WP-06P-A(복사 후 창 유지)는 병합되었다. 현재 WP-06 최종 결과는 [WP-06 완료 및 검증표](WP06_COMPLETION.md) 참조. 아래 §21의 옛 **`WP-07 Optional global shortcut`** 명칭은 현재 사용하지 않는다. 전역 단축키는 **WP-06S 구현 완료**, 현재의 **WP-07은 Secure Copy / Secure IME (미구현)** 를 뜻한다. §25의 미체크 게이트 표는 작성 당시의 snapshot이며 현재 미완료 목록으로 사용하지 않는다.
+
+
 - 작성일: 2026-09-26
 - 감사 대상: `EntropyRoot/ClipVault`
 - 감사 기준 커밋: `ee1f24af3010dd26be7d95545ea9dbf0fd703622`
@@ -845,11 +848,11 @@ Shizuku bridge에는 clipboard 이외의 범용 input API를 추가하지 않는
 - taskbar/notification/Quick Settings invocation
 - DeX density
 
-## WP-07 Optional global shortcut
+## WP-07 Secure text boundary — *current work package (planned)*
 
-- 별도 feature flag
-- AccessibilityService 사용 시 최소 기능
-- disabled by default
+- [WP-07A/B/C/D 설계](WP07_SECURE_TEXT_BOUNDARY.md): Secure Copy `ACTION_PROCESS_TEXT` 및 Secure IME `InputConnection.commitText`
+- 시스템 클립보드 직접 경유를 피하는 명시적 입출력 경로. 실패 시 일반 복사로 자동 fallback 금지.
+- 접근성 서비스는 요구하지 않는다. 삼성 DeX 글로벌 단축키는 **WP-06S에서 이미 구현**했다.
 
 ## WP-08 Optional StrongBox
 
@@ -950,7 +953,10 @@ Instrumentation:
 
 ---
 
-# 25. 구현 시작 Gate
+# 25. 구현 시작 Gate (최초 감사 당시 체크리스트)
+
+> 다음 `[ ]` 표시는 최초 설계 시점의 판정이며 최신 코드의 진행률/미완료 내역을 나타내지 않는다. WP-06 현재 상태는 [완료표](WP06_COMPLETION.md)를 기준으로 한다.
+
 
 Repository:
 

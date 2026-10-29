@@ -22,8 +22,9 @@ There is intentionally no recovery key, server escrow or bypass. Losing or inval
 ## Runtime protections
 
 - `FLAG_SECURE` blocks screenshots and recent-app previews.
-- QuickPaste has no plaintext cache: it shows vault content only while the vault is unlocked through the same `BiometricPrompt` + `CryptoObject` path, cannot enroll a new key, is not exported, is excluded from recents with its thumbnail disabled, never persists the search query and closes when hidden. It restores a clip to the clipboard only; it does not inject input or auto-paste.
+- QuickPaste has **no persistent plaintext query/result cache**: it shows content only while the vault is unlocked through `BiometricPrompt` + `CryptoObject`, cannot enroll a key, and its real `QuickPasteActivity` remains `exported=false`, recents-excluded and thumbnail-protected. On ordinary background `onStop()`, it **keeps the DeX task alive** (for resized-window restoration) while clearing the search query and decrypted result state; on vault lock it also drops exposed results. Esc/explicit Close finish the task; copying closes it by default, but the user can opt in to **Keep open after copy**. It only writes selected content to the **system** clipboard and never injects input or auto-pastes.
 - Foreground notifications contain status only, never clipboard content.
+- The opt-in `QuickPasteLauncherAlias` is a separate **exported launcher entry** (`MAIN/LAUNCHER` + `MAIN/INFO`) and is disabled by default. Other apps may open the QuickPaste window through it while enabled; opening does **not** grant vault reads or bypass authentication. The alias does not export `QuickPasteActivity` itself.
 - Copied-back clips use `EXTRA_IS_SENSITIVE` where supported.
 - **The Android/system clipboard is outside ClipVault's encrypted trust boundary.** `EXTRA_IS_SENSITIVE` is treated as a display/privacy hint, not as a confidentiality guarantee. Once plaintext is copied back, vendor clipboard history, keyboard clipboard UI, cross-device clipboard features and other platform-permitted handling are outside ClipVault's control.
 - Vault lock drops repository access immediately and closes SQLCipher on the serialized I/O executor.
@@ -42,7 +43,7 @@ This path is intentionally designed without Accessibility Service, Samsung Keybo
 
 WP-07 is a **planned design, not a current release guarantee**. Until its clipboard non-interference tests pass, users must assume that the existing normal Copy/QuickPaste restore path exposes plaintext to the system clipboard.
 
-See [docs/WP07_SECURE_TEXT_BOUNDARY.md](docs/WP07_SECURE_TEXT_BOUNDARY.md) and [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
+See [docs/WP07_SECURE_TEXT_BOUNDARY.md](docs/WP07_SECURE_TEXT_BOUNDARY.md), [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md), and the [WP-06 implementation/verification boundary](docs/WP06_COMPLETION.md).
 
 ## Shizuku boundary
 
