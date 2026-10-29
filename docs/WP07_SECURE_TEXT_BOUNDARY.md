@@ -1,6 +1,6 @@
 # WP-07 Secure Text Boundary
 
-상태: **WP-07A Secure Copy PoC implementation in progress (CI/실기기 검증 전); WP-07B~D 미구현.** [WP-07A 구현/검증 가이드](WP07A_SECURE_COPY_POC.md) 참조.
+상태: **WP-07A Secure Copy (PROCESS_TEXT 및 별도 ACTION_SEND 공유 대상) PoC 구현 중 — PROCESS_TEXT 실기기 저장/클립보드 비간섭 일부 PASS, 공유 경로·CI·보안 종합 검증 전; WP-07B~D 미구현.** [WP-07A 구현/검증 가이드](WP07A_SECURE_COPY_POC.md) 참조.
 
 이 문서는 ClipVault가 단순한 encrypted clipboard history를 넘어, 민감한 텍스트가 가능한 한 Android/System clipboard를 통과하지 않고 vault에 들어오고 나가도록 하는 보안 경계와 UX 방향을 고정한다.
 
@@ -82,13 +82,13 @@ SQLCipher
 
 요구사항:
 
-- `android.intent.action.PROCESS_TEXT` / `text/plain` 기반의 명시적인 사용자 동작만 처리한다.
+- `android.intent.action.PROCESS_TEXT` / `text/plain` 선택 메뉴와 명시적 `ACTION_SEND` / `text/plain` **Secure Copy** 공유 대상만 처리한다. 기존 MainActivity 일반 공유 대상은 별도이며, 사용자의 의사 없이 이를 Secure Copy로 재라우팅하지 않는다.
 - 선택 텍스트를 system clipboard에 쓰지 않는다.
 - clipboard capture pipeline을 우회하므로 같은 텍스트가 Samsung/Android clipboard history에 생성되어서는 안 된다.
 - vault가 잠긴 경우 durable write 전에 기존 strong-biometric unlock boundary를 거친다.
 - secure-ingress 전용으로 별도의 silent persistence 경로를 추가하지 않는다. locked-state staging 재사용 여부는 별도 보안 결정 없이 자동 확대하지 않는다.
 - Activity/task 흔적, 로그, notification, saved-state에 평문을 남기지 않는다.
-- source app이 `PROCESS_TEXT`를 제공하지 않거나 자체 selection UI를 쓰는 경우 이 기능을 강제하지 않는다.
+- source app이 `PROCESS_TEXT`를 제공하지 않거나 자체 selection UI를 쓰는 경우 이 기능을 강제하지 않는다. 사용자가 지원되는 앱의 공유 메뉴에서 **Secure Copy to ClipVault**를 명시적으로 선택할 수 있다.
 
 ### 3.2 Secure Paste — direct egress
 
