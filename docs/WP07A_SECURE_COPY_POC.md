@@ -1,6 +1,6 @@
 # WP-07A — Secure Copy PoC (Android text-selection ingress)
 
-**상태: PR #19 Draft — CI #97 verify/instrumentation PASS (코드 기준). Secure Copy 저장·클립보드 비간섭 실기기 PASS (관측 범위). 삼성 인터넷/Obsidian은 PROCESS_TEXT 직접 팝업에서는 미노출이지만 ACTION_SEND Android 공유 시트에서 Secure Copy 표시·동작 PASS. 추가 보안 에지 검증은 별도 (2026-10-30).**
+**상태: PR #19 Draft — CI #98 verify/instrumentation PASS (기존 HEAD `08cc4d6`). 최신 보안 강화 커밋은 별도 CI 재검증 필요. Secure Copy 저장·클립보드 비간섭 실기기 PASS (타깃 기기의 관측 범위). 삼성 인터넷/Obsidian은 PROCESS_TEXT 직접 팝업에서는 미노출이지만 ACTION_SEND 공유 시트에서 PASS. 인증 취소·잠금 경합·Shizuku 이벤트 부재 검증은 미완료 (2026-10-30).**
 
 [WP-07 설계](WP07_SECURE_TEXT_BOUNDARY.md)의 A 단계만 구현한다. B 단계의 IME / direct paste는 이 PR에 없다. Android 사용자가 앱 내부에서 텍스트를 길게 누르고 **텍스트 선택** → toolbar overflow의 **Secure Copy to ClipVault** 항목을 명시적으로 실행하거나, **공유** → **Secure Copy to ClipVault** 대상으로 명시적으로 보내는 경우에만 동작한다. 타사 앱이 컨텍스트 메뉴에 PROCESS_TEXT를 반드시 노출하는 것은 아니다.
 
@@ -31,6 +31,16 @@
 - [ ] **Security**: 앱 자체 `ClipboardManager.setPrimaryClip()` 호출 없음, 원래 캡처 정책과 분리, default permission 변화 없음.
 
 **릴리스 금지 조건:** 위 Samsung clipboard non-interference 게이트를 통과하기 전까지 'Secure Copy bypasses the system clipboard'라는 사용자 대상 보안 주장을 완료로 표기하지 않는다. 다음 WP-07B Secure Paste는 별도 구현/리뷰다.
+
+## PR #19 병합 전 보안 강화 및 최종 게이트 (2026-10-30)
+
+- **엄격한 입력 검증:** 명시적 plain-text 요청이라도 `EXTRA_STREAM`이나 `Intent.data` URI가 함께 존재하는 혼합 입력은 거절한다. 첨부파일을 저장하지 않았는데 전부 안전하게 저장한 것으로 오해하는 문제를 방지한다. 일반 텍스트 공유의 정상 동작은 유지한다.
+- **취소·잠금 경합:** Activity의 요청 활성 플래그를 IO executor의 SQLCipher insert 직전, lock epoch 보호 구간에서 재검사한다. 현재 기기가 잠겼는지도 해당 시점에 확인한다. 이는 *쓰기 시작 전*의 취소를 차단하는 게이트이며, 이미 시작된 SQLCipher insert의 원자적 rollback을 보장하는 것은 아니다.
+- **취소 UI:** `SAVING` 상태에서는 Cancel 버튼과 Back 취소를 제공하지 않는다. 확정된 Save 이후의 in-flight insert가 이미 완료됐을 수 있으므로 '취소 성공'이라고 오인시키지 않기 위함이다. 인증 중에는 기존 Cancel 동작 유지.
+- **자동 테스트:** 추가 unit은 비활성 요청의 precommit 거절을 검사한다. 추가 instrumentation은 텍스트와 STREAM/URI가 섞인 Intent를 거절하는지 확인한다. CI 통과는 UI/Intent 코드 경로 검증이지 모든 보안 타이밍/실기기 결과의 대체가 아니다.
+- **최신 이전 CI:** [#98](https://github.com/NeonBee/ClipVault/actions/runs/40999161835) verify/instrumentation SUCCESS (head `08cc4d6`). 최신 변경 커밋의 새 CI 결과를 별도로 확인한다.
+
+**병합 보류 조건 / 실기기 수동 검증 필요:** 잠긴 Vault의 biometric 성공·취소·실패·미등록, 인증 도중 Home/화면 꺼짐/다른 앱 전환, 저장 직전 잠금 이벤트, Shizuku 캡처 이벤트에 secure payload가 포함되지 않았는지 확인. `PROCESS_TEXT`와 보안 `ACTION_SEND` 경로를 구별하고, 각 경로에서 system primary clip과 삼성 키보드 히스토리도 재확인한다. 원문 정규화(양끝 공백 제거·연속 개행 정리)는 현재 PoC의 알려진 한계로 유지한다.
 
 ## Samsung DeX / One UI 8.0 selection-toolbar 실기기 관측 (2026-10-29)
 
