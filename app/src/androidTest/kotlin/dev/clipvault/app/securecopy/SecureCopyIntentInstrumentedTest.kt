@@ -63,6 +63,18 @@ class SecureCopyIntentInstrumentedTest {
             type = "text/plain"
             putExtra(Intent.EXTRA_STREAM, android.net.Uri.parse("content://other.provider/private"))
         }))
+        // A text/plain intent can carry both readable text and an attachment/URI.
+        // Secure Copy must reject ambiguous mixed payloads rather than silently
+        // saving only the text and implying that the attachment was captured.
+        assertNull(SecureCopyRequest.incomingText(share("visible text").apply {
+            putExtra(Intent.EXTRA_STREAM, android.net.Uri.parse("content://other.provider/secret"))
+        }))
+        assertNull(SecureCopyRequest.incomingText(share("visible text").apply {
+            data = android.net.Uri.parse("content://other.provider/secret")
+        }))
+        assertNull(SecureCopyRequest.incomingText(selection("visible text").apply {
+            data = android.net.Uri.parse("content://other.provider/secret")
+        }))
         assertNull(SecureCopyRequest.incomingText(Intent(Intent.ACTION_PROCESS_TEXT).apply { type = "text/plain" }))
         val huge = "x".repeat(SecureCopyRequest.MAX_SELECTED_CHARS + 1)
         assertNull(SecureCopyRequest.incomingText(selection(huge)))
