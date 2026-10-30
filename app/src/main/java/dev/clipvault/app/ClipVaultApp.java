@@ -42,6 +42,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.security.GeneralSecurityException;
 
 public final class ClipVaultApp extends Application {
@@ -363,14 +364,21 @@ public final class ClipVaultApp extends Application {
      * Lock epoch and SQLCipher insertion are guarded together so no insert starts after lockVault().
      * No raw text appears in notifications, preferences, capture diagnostics or clipboard events.
      */
-    public boolean saveExplicitSecureText(@NonNull String rawText, long expectedLockEpoch) {
+    public boolean saveExplicitSecureText(@NonNull String rawText, long expectedLockEpoch,
+                                          @NonNull BooleanSupplier requestActive) {
         if (Looper.myLooper() == Looper.getMainLooper()) {
             throw new IllegalStateException("Secure text storage must run off the main thread");
         }
         if (rawText.trim().isEmpty() || rawText.length() > 128_000) return false;
         boolean inserted;
         synchronized (lockEpoch) {
-            if (!unlocked || lockEpoch.get() != expectedLockEpoch || repository == null) return false;
+            // The UI may have been cancelled or backgrounded while this operation was queued.
+            // Re-check its volatile cancellation token immediately before a durable write,
+            // in the same lock-epoch critical section as the insertion.
+            if (!requestActive.getAsBoolean() || !unlocked
+                    || lockEpoch.get() != expectedLockEpoch || repository == null) return false;
+            KeyguardManager keyguard = getSystemService(KeyguardManager.class);
+            if (keyguard == null || keyguard.isDeviceLocked()) return false;
             inserted = repository.insert(rawText, System.currentTimeMillis()) > 0;
         }
         if (inserted) notifyDataChanged();
