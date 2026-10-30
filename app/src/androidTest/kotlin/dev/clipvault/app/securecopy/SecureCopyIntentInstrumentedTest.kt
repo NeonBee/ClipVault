@@ -70,10 +70,19 @@ class SecureCopyIntentInstrumentedTest {
             putExtra(Intent.EXTRA_STREAM, android.net.Uri.parse("content://other.provider/secret"))
         }))
         assertNull(SecureCopyRequest.incomingText(share("visible text").apply {
-            data = android.net.Uri.parse("content://other.provider/secret")
+            setDataAndType(android.net.Uri.parse("content://other.provider/secret"), "text/plain")
         }))
         assertNull(SecureCopyRequest.incomingText(selection("visible text").apply {
-            data = android.net.Uri.parse("content://other.provider/secret")
+            setDataAndType(android.net.Uri.parse("content://other.provider/secret"), "text/plain")
+        }))
+        assertNull(SecureCopyRequest.incomingText(share("visible text").apply {
+            clipData = android.content.ClipData.newRawUri(
+                "attachment", android.net.Uri.parse("content://other.provider/secret")
+            )
+        }))
+        // Pure text ClipData is common on share intents; keep it compatible.
+        assertEquals("visible text", SecureCopyRequest.incomingText(share("visible text").apply {
+            clipData = android.content.ClipData.newPlainText("text", "visible text")
         }))
         assertNull(SecureCopyRequest.incomingText(Intent(Intent.ACTION_PROCESS_TEXT).apply { type = "text/plain" }))
         val huge = "x".repeat(SecureCopyRequest.MAX_SELECTED_CHARS + 1)
