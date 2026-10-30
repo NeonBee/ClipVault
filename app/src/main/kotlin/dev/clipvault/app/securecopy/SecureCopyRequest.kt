@@ -12,6 +12,9 @@ internal object SecureCopyRequest {
 
     fun incomingText(intent: Intent?): String? {
         if (intent == null || intent.type != "text/plain") return null
+        // Mixed text + attachment/URI is not a pure-text secure ingress. Never
+        // silently discard a second payload and imply the entire share was saved.
+        if (intent.hasExtra(Intent.EXTRA_STREAM) || intent.data != null) return null
         val extra = when (intent.action) {
             Intent.ACTION_PROCESS_TEXT -> Intent.EXTRA_PROCESS_TEXT
             Intent.ACTION_SEND -> Intent.EXTRA_TEXT
