@@ -1,6 +1,6 @@
 # WP-07A — Secure Copy PoC (Android text-selection ingress)
 
-**상태: PR #19 Draft — CI #95 verify/instrumentation PASS, Secure Copy 수신·직접 저장·클립보드 비간섭 일부 실기기 PASS. 앱별 메뉴 노출 편차와 나머지 보안 에지 케이스 미완료 (2026-10-29).**
+**상태: PR #19 Draft — CI #97 verify/instrumentation PASS (코드 기준). Secure Copy 저장·클립보드 비간섭 실기기 PASS (관측 범위). 삼성 인터넷/Obsidian은 PROCESS_TEXT 직접 팝업에서는 미노출이지만 ACTION_SEND Android 공유 시트에서 Secure Copy 표시·동작 PASS. 추가 보안 에지 검증은 별도 (2026-10-30).**
 
 [WP-07 설계](WP07_SECURE_TEXT_BOUNDARY.md)의 A 단계만 구현한다. B 단계의 IME / direct paste는 이 PR에 없다. Android 사용자가 앱 내부에서 텍스트를 길게 누르고 **텍스트 선택** → toolbar overflow의 **Secure Copy to ClipVault** 항목을 명시적으로 실행하거나, **공유** → **Secure Copy to ClipVault** 대상으로 명시적으로 보내는 경우에만 동작한다. 타사 앱이 컨텍스트 메뉴에 PROCESS_TEXT를 반드시 노출하는 것은 아니다.
 
@@ -24,7 +24,7 @@
 
 - [x] **CI unit**: 잠금 상태, lock epoch 변경, 정상 unlocked 상태에서 direct insert decision — [CI #95](https://github.com/NeonBee/ClipVault/actions/runs/40892641530) verify PASS.
 - [x] **CI instrumentation**: PROCESS_TEXT / SEND exact multilingual/whitespace payload, missing/invalid/oversize/URI reject, PROCESS_TEXT → 전용 Activity *한 곳만* 등록, SEND → SecureCopyActivity + MainActivity **두 대상 구분** — [CI #95](https://github.com/NeonBee/ClipVault/actions/runs/40892641530) instrumentation PASS.
-- [ ] **Manual Samsung share**: 삼성 인터넷 / Obsidian에서 텍스트 선택 → 공유 → **Secure Copy to ClipVault** 표시·저장, 그리고 기존 **ClipVault** 일반 공유 대상과 라벨 구분을 확인. 삼성 노트 / Chrome / Gmail / Discord / Telegram / Termux는 추후 확대.
+- [x] **Manual Samsung share (사용자 관측 범위)**: 삼성 인터넷 / Obsidian에서 텍스트 선택 → **Android 공유 시트** → **Secure Copy to ClipVault** 표시·저장 **PASS**. 기존 일반 **ClipVault** 대상과의 시트별 라벨 구분·기타 앱 범위 확대는 별도로 확인한다.
 - [ ] **Manual auth**: 잠긴 Vault에서 Save → strong biometric success 후 선택 문자열만 저장되는지; 취소·오류·unprovisioned는 미저장 확인.
 - [ ] **Manual no-clipboard**: **실기기 관측 범위 PASS** — Secure Copy 전후 system primary clip·Samsung Keyboard clipboard history 값 유지, 신규 Secure Copy 텍스트 미노출. 아직 Shizuku 캡처 이벤트 미발생의 독립 확인 및 모든 앱/경로에 대한 반복 검증은 미완료.
 - [ ] **Manual edge**: 개행/한국어/URL/코드, 긴 텍스트, read-only selection, 키보드·DeX·폰 화면 및 취소/잠금 중단.
@@ -41,8 +41,8 @@
 | ChatGPT 앱 내부 텍스트 선택/우클릭 | **PASS** — 실제 메뉴에 독립 항목 표시 | **PASS** — 직접 선택 후 저장 성공 |
 | Microsoft Edge에서 텍스트 선택 | **PASS (사용자 보고)** — Secure Copy 항목 표시 | **PASS (선택 이후 저장 기능 관측 범위)** |
 | 삼성 메시지(Samsung Messages) 앱 | **PASS (사용자 보고)** — Secure Copy 항목 표시 | **PASS (선택 이후 저장 기능 관측 범위)** |
-| 삼성 인터넷 텍스트 선택 | **FAIL** — 일반 메뉴에 독립 항목 미표시 | 해당 메뉴에서 직접 테스트 불가 |
-| Obsidian 텍스트 선택 | **FAIL** — 일반 메뉴에 독립 항목 미표시 | 해당 메뉴에서 직접 테스트 불가 |
+| 삼성 인터넷 텍스트 선택 | **FAIL** — 기본 텍스트 선택 팝업에 독립 PROCESS_TEXT 항목 미표시 | **PASS (별도 공유 시트)** — 공유 → Secure Copy to ClipVault 선택·저장 |
+| Obsidian 텍스트 선택 | **FAIL** — 기본 텍스트 선택 팝업에 독립 PROCESS_TEXT 항목 미표시 | **PASS (별도 공유 시트)** — 공유 → Secure Copy to ClipVault 선택·저장 |
 | 삼성 선택 메뉴의 **사전** → Android 앱 선택기 → ClipVault | 사전 경유로 ClipVault 표시 | **PASS** — 선택 텍스트가 Vault에 저장됨 |
 | ADB `cmd package query-activities -a android.intent.action.PROCESS_TEXT -t text/plain` | **PASS** — `dev.clipvault.app.debug/dev.clipvault.app.securecopy.SecureCopyActivity` 검색됨 | 컴포넌트 직접 실행 확인 |
 
@@ -52,16 +52,16 @@
 
 **추가 보안 실기기 관측 (2026-10-29 사용자 보고):** 기존 PROCESS_TEXT 및 최근 추가한 보안 저장 경로를 사용한 테스트에서 **시스템 클립보드 기존 값 유지**, **삼성 키보드 클립보드 기록 유지**, **Secure Copy 새 텍스트가 양쪽에 나타나지 않음** — **PASS (사용자가 수행한 테스트 범위)**. 공유/선택 경로별 전체 앱 매트릭스, 별도 Shizuku 캡처 이벤트 부재, 인증 취소·잠금 중단 등은 아직 완전히 검증되지 않았다. Android 전체 또는 모든 앱에서 비간섭이 보장된다는 뜻이 아니다.
 
-**공유 호환 구현 (코드 추가, 앱별 노출 제한):** 삼성 인터넷/Obsidian의 PROCESS_TEXT 독립 메뉴가 보이지 않는 경우 **공유 → Secure Copy to ClipVault**를 명시적으로 선택할 수 있도록 ACTION_SEND/text/plain의 두 번째 resolver를 추가했다. 전체 기능·보안 테스트 중 사용자 보고 항목은 기대대로 동작했지만, **삼성 인터넷·Obsidian에서는 여전히 Secure Copy 항목이 표시되지 않는다**. 이 두 앱의 실제 공유 Intent MIME/chooser 및 편집·읽기 모드 차이를 별도로 진단해야 한다. 기존 **공유 → ClipVault**는 MainActivity.capture()와 pending-store가 남아 있는 **일반 기록 경로**이다. 동일한 보안 기능으로 오인해서는 안 되며 공유 메뉴의 앱 표시 방식은 실기기에서 확인해야 한다.
+**공유 호환 구현 (삼성 인터넷/Obsidian 실기기 PASS):** 두 앱에서는 기본 텍스트 선택 팝업에 **PROCESS_TEXT 독립 항목이 없지만**, **공유 → Android 공유 시트 → Secure Copy to ClipVault**가 정상 표시되고 인증·저장 및 기존 클립보드 비간섭 테스트도 기대대로 동작했다. 따라서 이 두 앱에서 **공유 시트가 검증된 호환 진입점**이다. PROCESS_TEXT 독립 팝업 미표시는 앱별 UX 제한으로만 남긴다. 기존 **공유 → ClipVault**는 MainActivity.capture()와 pending-store가 남아 있는 **일반 기록 경로**이다. 동일한 보안 기능으로 오인해서는 안 되며 공유 메뉴의 앱 표시 방식은 실기기에서 확인해야 한다.
 
 **기능 검증과 보안 검증 분리:** 전용 Secure Copy Activity에서는 일반 clipboard로 fallback하지 않는다. 사용자가 확인한 경로의 저장·클립보드 비간섭은 PASS이나, 두 가지 진입점(PROCESS_TEXT, ACTION_SEND)이 각 앱에서 어떻게 표시되는지는 앱별로 다르다. 이번 결과만으로 제조사 전체 또는 모든 입력/공유 앱에서 동작을 보장하지 않는다.
 
 ### CI #95와 앱별 메뉴 노출의 분리 (2026-10-29)
 
-- [CI #95](https://github.com/NeonBee/ClipVault/actions/runs/40892641530): **verify PASS + instrumentation PASS**. Manifest의 `ACTION_PROCESS_TEXT` 단일 수신자 및 `ACTION_SEND` 보안/일반 공유 두 수신자 테스트 포함.
+- [CI #95](https://github.com/NeonBee/ClipVault/actions/runs/40892641530) 및 [CI #97](https://github.com/NeonBee/ClipVault/actions/runs/40897259392): **verify PASS + instrumentation PASS**. Manifest의 `ACTION_PROCESS_TEXT` 단일 수신자 및 `ACTION_SEND` 보안/일반 공유 두 수신자 테스트 포함.
 - **Edge 및 삼성 메시지: PASS** — 텍스트 선택 흐름에서 Secure Copy 메뉴 표시. 앞서 확인한 ChatGPT 경로에서도 표시·저장 성공.
-- **삼성 인터넷 및 Obsidian: 메뉴 노출 FAIL** — One UI 앱 관리에서 ClipVault 허용, 패키지 관리자 인식 및 다른 앱의 호출 성공에도 독립 항목이 표시되지 않음. **공유 시트 경로 또한 사용자가 기대한 노출을 확인하지 못함**; 삼성 인터넷의 페이지 전체 공유와 선택 텍스트 공유, Obsidian의 편집/읽기 모드 및 `text/plain` 여부를 구분하는 후속 조사 필요.
-- 이 문제를 **앱별 선택/공유 UI 호환성 제한**으로 분류한다. 현재 로그만으로 삼성 인터넷과 Obsidian의 내부 코드 구현이 동일하거나 One UI가 전역적으로 차단한다고 확정하지 않는다. 임의의 시스템 설정 변경·추가 권한으로 우회하려 하지 않는다.
+- **삼성 인터넷 및 Obsidian: PROCESS_TEXT 독립 팝업 노출 FAIL / Android ACTION_SEND 공유 시트 PASS** — One UI 앱 관리 허용 및 패키지 관리자 등록은 정상이며, 기본 텍스트 선택 팝업에는 독립 항목이 없지만 공유 시트에서는 Secure Copy 대상이 나타나고 저장된다. **공유 시트까지 미노출이라는 이전 기록을 정정**한다. 더 이상 공유 Intent 문제로 분류하지 않는다.
+- 남은 문제를 **앱별 PROCESS_TEXT 선택 팝업 노출 제한**으로만 분류한다. 현재 로그만으로 삼성 인터넷과 Obsidian의 내부 코드 구현이 동일하거나 One UI가 전역적으로 차단한다고 확정하지 않는다. 임의의 시스템 설정 변경·추가 권한으로 우회하려 하지 않는다.
 
 ## Windows 데이터 보존형 설치
 
