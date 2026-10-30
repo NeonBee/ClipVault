@@ -33,6 +33,6 @@ internal object SecureCopyRequest {
 
 /** Pure decision logic; also checked immediately before the SQLCipher write under lock epoch. */
 internal object SecureCopyGate {
-    fun canCommit(isUnlocked: Boolean, requestEpoch: Long, currentEpoch: Long): Boolean =
-        isUnlocked && requestEpoch == currentEpoch
+    fun canCommit(isUnlocked: Boolean, requestEpoch: Long, currentEpoch: Long, requestActive: Boolean): Boolean =
+        requestActive && isUnlocked && requestEpoch == currentEpoch
 }
