@@ -15,6 +15,14 @@ internal object SecureCopyRequest {
         // Mixed text + attachment/URI is not a pure-text secure ingress. Never
         // silently discard a second payload and imply the entire share was saved.
         if (intent.hasExtra(Intent.EXTRA_STREAM) || intent.data != null) return null
+        // Some share senders put an attachment into ClipData while EXTRA_TEXT
+        // contains a caption. Pure text ClipData is fine; URI/Intent items are not.
+        intent.clipData?.let { clip ->
+            for (index in 0 until clip.itemCount) {
+                val item = clip.getItemAt(index)
+                if (item.uri != null || item.intent != null) return null
+            }
+        }
         val extra = when (intent.action) {
             Intent.ACTION_PROCESS_TEXT -> Intent.EXTRA_PROCESS_TEXT
             Intent.ACTION_SEND -> Intent.EXTRA_TEXT
