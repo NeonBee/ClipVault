@@ -103,6 +103,24 @@ class SecureCopyIntentInstrumentedTest {
         assertEquals("Only the two intentional text/plain share targets", 2, targets.size)
     }
 
+    @Test fun secureActivityClearsIncomingIntentAndProtectsWindow() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val launch = selection("private material that must not survive an Activity restart").apply {
+            setClass(context, SecureCopyActivity::class.java)
+        }
+        // This does not provision or open a vault, and does not touch the device clipboard.
+        androidx.test.core.app.ActivityScenario.launch<SecureCopyActivity>(launch).use { scenario ->
+            scenario.onActivity { activity ->
+                assertFalse(activity.intent.hasExtra(Intent.EXTRA_PROCESS_TEXT))
+                assertFalse(activity.intent.hasExtra(Intent.EXTRA_TEXT))
+                assertEquals(null, activity.intent.action)
+                assertTrue(
+                    activity.window.attributes.flags and android.view.WindowManager.LayoutParams.FLAG_SECURE != 0
+                )
+            }
+        }
+    }
+
     private fun targetsFor(action: String): List<String> {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val intent = Intent(action).apply {
