@@ -94,7 +94,11 @@ class SecureCopyActivity : AppCompatActivity() {
                     } else if (status == Status.AUTHENTICATING || status == Status.SAVING) {
                         Text(getString(R.string.secure_copy_working))
                     }
-                    OutlinedButton(onClick = ::abort) { Text(getString(R.string.cancel)) }
+                    // Once the serialized SQLCipher write begins it may already be committed;
+                    // do not present a Cancel button that cannot guarantee rollback.
+                    if (status != Status.SAVING) {
+                        OutlinedButton(onClick = ::abort) { Text(getString(R.string.cancel)) }
+                    }
                 }
             }
         }
@@ -124,7 +128,7 @@ class SecureCopyActivity : AppCompatActivity() {
         status = Status.SAVING
         acceptWrite = true
         val epoch = app.lockEpoch()
-        if (!SecureCopyGate.canCommit(app.isUnlocked, epoch, app.lockEpoch())) {
+        if (!SecureCopyGate.canCommit(app.isUnlocked, epoch, app.lockEpoch(), acceptWrite)) {
             acceptWrite = false
             status = Status.FAILED
             return
@@ -133,7 +137,7 @@ class SecureCopyActivity : AppCompatActivity() {
             // Single app-wide IO executor serializes this write with vault open/close. Never
             // call ClipVaultApp.capture(), which can write to staging even when locked.
             val saved = runCatching {
-                if (!acceptWrite) false else app.saveExplicitSecureText(payload, epoch)
+                if (!acceptWrite) false else app.saveExplicitSecureText(payload, epoch) { acceptWrite }
             }.getOrDefault(false)
             runOnUiThread {
                 acceptWrite = false
