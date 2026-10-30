@@ -68,7 +68,11 @@ class SecureCopyActivity : AppCompatActivity() {
         unlocker = BiometricVaultUnlock(this, app, VaultKeyManager(this), unlockListener)
         app.addLockListener(lockListener)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() = abort()
+            override fun handleOnBackPressed() {
+                // A SQLCipher insert can already be committed after Save is confirmed;
+                // Back must not pretend to cancel a write in progress.
+                if (status != Status.SAVING) abort()
+            }
         })
 
         setContent {
