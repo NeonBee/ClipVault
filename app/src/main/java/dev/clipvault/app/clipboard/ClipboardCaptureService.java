@@ -48,10 +48,17 @@ public final class ClipboardCaptureService extends Service {
         super.onCreate();
         createNotificationChannel();
         if (BuildConfig.DEBUG) {
-            debugBridgeEvents = new AtomicLong(getSharedPreferences(ClipVaultApp.PREFS, MODE_PRIVATE)
-                    .getLong(ClipVaultApp.PREF_DEBUG_BRIDGE_EVENTS, 0L));
-            debugCaptureAccepts = new AtomicLong(getSharedPreferences(ClipVaultApp.PREFS, MODE_PRIVATE)
-                    .getLong(ClipVaultApp.PREF_DEBUG_CAPTURE_ACCEPTS, 0L));
+            android.content.SharedPreferences prefs =
+                    getSharedPreferences(ClipVaultApp.PREFS, MODE_PRIVATE);
+            debugBridgeEvents = new AtomicLong(prefs.getLong(ClipVaultApp.PREF_DEBUG_BRIDGE_EVENTS, 0L));
+            debugCaptureAccepts = new AtomicLong(prefs.getLong(ClipVaultApp.PREF_DEBUG_CAPTURE_ACCEPTS, 0L));
+            // A first-time capture session can legitimately receive zero events. Persist
+            // the baseline now so the device record distinguishes '0 observed' from
+            // 'counter absent / old APK / service not started'.
+            prefs.edit()
+                    .putLong(ClipVaultApp.PREF_DEBUG_BRIDGE_EVENTS, debugBridgeEvents.get())
+                    .putLong(ClipVaultApp.PREF_DEBUG_CAPTURE_ACCEPTS, debugCaptureAccepts.get())
+                    .apply();
         }
         clipboardManager = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         clipboardManager.addPrimaryClipChangedListener(localListener);
