@@ -55,6 +55,7 @@ class SecurePasteImeService : InputMethodService() {
     private var suppressSearch = false
     private var inserting = false
     private var deferredSearch: Runnable? = null
+    private var imeWindowVisible = false
 
     private val lockListener = Runnable {
         clearSensitiveState()
@@ -87,7 +88,9 @@ class SecurePasteImeService : InputMethodService() {
             gravity = Gravity.CENTER_HORIZONTAL
             // Preserve editor-side hardware typing until the user explicitly taps Search.
             isFocusableInTouchMode = true
-            setPadding(dp(12), dp(10), dp(12), dp(12))
+            // One UI's bottom-left keyboard switcher can live inside the gesture-nav area.
+            // Keep the last tappable result clear of that zone even when nav bar insets are 0.
+            setPadding(dp(12), dp(10), dp(12), dp(28))
             setBackgroundColor(ui.background)
         }
         val panel = LinearLayout(this).apply {
@@ -132,6 +135,26 @@ class SecurePasteImeService : InputMethodService() {
             setOnClickListener { showPicker() }
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(40)))
         panel.addView(header)
+
+        val footer = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(2), dp(8), dp(2), 0)
+        }
+        footer.addView(ImageView(this).apply {
+            setImageResource(android.R.drawable.ic_lock_lock)
+            imageTintList = ColorStateList.valueOf(ui.accent)
+            contentDescription = null
+        }, LinearLayout.LayoutParams(dp(14), dp(14)))
+        footer.addView(TextView(this).apply {
+            setText(R.string.secure_paste_private_footer)
+            textSize = 11f
+            setTextColor(ui.secondary)
+            setPadding(dp(7), 0, 0, 0)
+            maxLines = 2
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        panel.addView(footer, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
 
         status = TextView(this).apply {
             setTextColor(ui.secondary)
@@ -247,24 +270,6 @@ class SecurePasteImeService : InputMethodService() {
             addView(rows)
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(listHeight)))
 
-        val footer = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(2), dp(8), dp(2), 0)
-        }
-        footer.addView(ImageView(this).apply {
-            setImageResource(android.R.drawable.ic_lock_lock)
-            imageTintList = ColorStateList.valueOf(ui.accent)
-            contentDescription = null
-        }, LinearLayout.LayoutParams(dp(14), dp(14)))
-        footer.addView(TextView(this).apply {
-            setText(R.string.secure_paste_private_footer)
-            textSize = 11f
-            setTextColor(ui.secondary)
-            setPadding(dp(7), 0, 0, 0)
-            maxLines = 2
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        panel.addView(footer)
         updateFilters()
         return root
     }
@@ -285,13 +290,24 @@ class SecurePasteImeService : InputMethodService() {
 
     override fun onWindowShown() {
         super.onWindowShown()
+        // Unlike an Activity, the IME does not contribute to ActivityLifecycleCallbacks.
+        // A visible user-selected panel is foreground Vault UI: pause only the background
+        // timeout, not explicit / screen-off locks. The callback may be repeated on One UI.
+        updateImeVisibility(true)
         // After the biometric Activity finishes Android may re-show the same input view.
         refresh()
     }
 
     override fun onWindowHidden() {
         clearSensitiveState()
+        updateImeVisibility(false)
         super.onWindowHidden()
+    }
+
+    private fun updateImeVisibility(visible: Boolean) {
+        if (imeWindowVisible == visible) return
+        imeWindowVisible = visible
+        app.onSecureImeVisibilityChanged(visible)
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -306,6 +322,8 @@ class SecurePasteImeService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        // onWindowHidden is not guaranteed before process/service teardown.
+        updateImeVisibility(false)
         app.removeLockListener(lockListener)
         clearSensitiveState()
         rows = null
