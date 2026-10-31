@@ -1,0 +1,44 @@
+# WP-07B — Secure Paste secondary IME PoC
+
+Status: **implementation PR / NOT device-certified / NOT a release guarantee**. WP-07A Secure Copy has already merged in PR #19 (CI #116 green; Galaxy S23 Ultra / One UI 8 targeted observations PASS). This page covers the separate Secure Paste egress experiment.
+
+## Scope and trust boundary
+
+- **Daily IME remains Samsung Keyboard.** This is an opt-in, retrieval-only Android `InputMethodService` activated by the user from the platform keyboard picker.
+- Unlocking uses a dedicated, non-exported `AppCompatActivity` with the existing `BiometricVaultUnlock` (`BIOMETRIC_STRONG + CryptoObject`) and SQLCipher key envelope. The Activity does not receive/retain the selected clip, editor token or plaintext from the IME.
+- The IME queries the existing `VaultRepository` on the shared serialized IO executor, displays up to 30 recent/pinned clips, and supports search using a **hardware keyboard**. There is deliberately **no custom QWERTY**. On touchscreen-only devices users can browse recent/pinned; on-screen search editing is deferred.
+- Selection runs `InputConnection.commitText(content, 1)` directly into the currently focused normal text editor. **No `ClipboardManager`, `SensitiveClipboard`, capture, pending-store, accessibility, Shizuku, overlay, shell or network fallback.** The existing QuickPaste normal copy path is unchanged.
+- `TYPE_NULL`, password variations, number, phone, date/time editors, invalid/missing input connections, mismatched editor package, stale lock epoch, keyguard lock and concurrent taps **fail closed**.
+- On reported commit success the IME discards the in-memory decrypted list and tries `switchToPreviousInputMethod()` (API 28+). If that fails, use **Keyboards** to manually switch back.
+- IME query/result state is not persisted in `SavedState`, preferences, logs, analytics, notifications or recent tasks. The IME window uses `FLAG_SECURE`; the unlock Activity is also secure and excluded from recents.
+- The **target application receives plaintext**, and a positive `commitText` return is not proof that the target persisted the text. A third-party target may still store, log, transmit or echo input.
+
+## Android setup and happy path (S23 Ultra / One UI 8 / DeX)
+
+1. Install debug from this branch only with **the same debug signing key** using `scripts/deploy-debug.ps1` (`adb install -r`). **Never uninstall, clear data or run connected instrumentation on a phone with a populated vault.**
+2. Open Android/Samsung keyboard settings → keyboard list / manage keyboards; explicitly enable **ClipVault Secure Paste**. The exact One UI path/wording may vary. Do **not** make it the permanent default IME.
+3. In a disposable notes/editor test field (no passwords or live confidential data), focus the field. Open the system keyboard switcher and choose **ClipVault Secure Paste**.
+4. If the Vault is locked, select **Unlock**, authenticate via strong biometrics, return to the original app/editor, and refocus it if Android lost focus. Tap **Refresh** if needed; a new editor connection must be established. No secret is passed between the authentication Activity and IME.
+5. Browse **Recent** or **Pinned**, or type a query with a physical keyboard. Select an item. Verify that it appears **exactly once** in the focused editor.
+6. Verify automatic previous-keyboard return. If unsupported, manually select Samsung Keyboard via **Keyboards**.
+
+## Verification gates (distinct from implementation)
+
+- [ ] CI `verify` / `instrumentation` green on this PR. Unit tests cover ordinary editors, unsupported/password fields, epoch/lock/package mismatch, no connection, exactly-once `commitText`, rejection and exception without fallback. Emulator IME registration/interaction and lifecycle still require instrumentation or manual emulator checks.
+- [ ] One UI **phone and DeX**, and **hardware keyboard**: IME enable/switch and keyboard return/picker fallback.
+- [ ] Strong biometric successful unlock, cancellation, key invalidation, unprovisioned account; no unauthorized row on lock.
+- [ ] Normal text, Korean, Unicode emoji, newline, URL, code, long text, multi-tap, editor switch, app backgrounding and screen-off while loading.
+- [ ] Unsupported/read-only/`TYPE_NULL`/password editor rejects with no clipboard writes; target app may override or reject `commitText`.
+- [ ] Preserve existing **system primary clipboard** value and **Samsung Keyboard clipboard history** after Secure Paste.
+- [ ] In `READY_EVENT` Shizuku mode, run a benign **ordinary Copy positive control** (previously observed listener +3 and distinct capture +1 on the target device), then an isolated Secure Paste and verify `debug_bridge_event_count` Δ0, `debug_capture_accept_count` Δ0. In `READY_POLL` mode only distinct accepted capture is an applicable counter. Repeat with both successful and rejected inserts. These counters are observations, not universal proof of all OS transitions.
+- [ ] Confirm no plaintext in logs, notification, app recents or UI after IME hide/lock/return; no paste to the wrong app or twice.
+- [ ] Do not run `connectedDebugAndroidTest`, `adb uninstall` or `pm clear` on the personal S23 Ultra. Use CI emulator and manual device probes, recording results separately.
+
+## Known limitations of this first vertical slice
+
+- On-screen QWERTY search is deliberately absent; a proper mobile search entry scheme and visual polish are follow-up work.
+- An Android Activity is used to host biometric authentication. Some OEMs may not restore the prior editor focus or IME window automatically; reselect the field and refresh. This is a **device verification gate**.
+- Android `InputConnection` success is a request/acceptance signal only. The current implementation does not support rich text, read-only editors, password fields, numeric fields or automated clipboard comparisons.
+- The preceding WP-07A entry path still uses `ACTION_PROCESS_TEXT` or the explicit secure `ACTION_SEND` receiver. The IME is **egress-only**, not a general keyboard read/capture service.
+
+Official API references: [Create an input method](https://developer.android.com/develop/ui/views/touch-and-input/creating-input-method), [InputMethodService](https://developer.android.com/reference/android/inputmethodservice/InputMethodService), [InputConnection](https://developer.android.com/reference/android/view/inputmethod/InputConnection).
