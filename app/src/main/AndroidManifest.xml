@@ -129,6 +129,31 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- WP-07B: explicitly enabled secondary IME, not a replacement for Samsung Keyboard.
+             System alone binds this exported service via BIND_INPUT_METHOD. No clipboard,
+             accessibility, overlay or network permission is introduced. -->
+        <service
+            android:name=".securepaste.SecurePasteImeService"
+            android:exported="true"
+            android:label="@string/secure_paste_ime_label"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/secure_paste_method" />
+        </service>
+
+        <!-- BiometricPrompt needs a FragmentActivity, not an InputMethodService.
+             Excluded from recents; no selected plaintext is ever passed in the Intent. -->
+        <activity
+            android:name=".securepaste.SecurePasteUnlockActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:autoRemoveFromRecents="true"
+            android:taskAffinity="${applicationId}.securepaste" />
+
         <service
             android:name=".clipboard.ClipboardCaptureService"
             android:exported="false"
