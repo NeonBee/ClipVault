@@ -52,7 +52,7 @@ public final class VaultAutoLock {
         secureImeVisible = visible;
         if (visible) {
             scheduler.cancel(lockTask);
-        } else if (startedActivities == 0 && !secureImeVisible && unlocked.getAsBoolean()) {
+        } else if (startedActivities == 0 && unlocked.getAsBoolean()) {
             scheduler.cancel(lockTask);
             scheduler.schedule(lockTask, clampDelay(configuredDelayMs.getAsLong()));
         }
@@ -73,7 +73,7 @@ public final class VaultAutoLock {
      * the stop armed nothing); arm the timer now in that case.
      */
     public void onVaultUnlocked() {
-        if (startedActivities == 0 && unlocked.getAsBoolean()) {
+        if (startedActivities == 0 && !secureImeVisible && unlocked.getAsBoolean()) {
             scheduler.cancel(lockTask);
             scheduler.schedule(lockTask, clampDelay(configuredDelayMs.getAsLong()));
         }
