@@ -25,8 +25,8 @@
 - [x] **CI unit**: 잠금 상태, lock epoch 변경, 정상 unlocked 상태에서 direct insert decision — [CI #95](https://github.com/NeonBee/ClipVault/actions/runs/40892641530) verify PASS.
 - [x] **CI instrumentation**: PROCESS_TEXT / SEND exact multilingual/whitespace payload, missing/invalid/oversize/URI reject, PROCESS_TEXT → 전용 Activity *한 곳만* 등록, SEND → SecureCopyActivity + MainActivity **두 대상 구분** — [CI #95](https://github.com/NeonBee/ClipVault/actions/runs/40892641530) instrumentation PASS.
 - [x] **Manual Samsung share (사용자 관측 범위)**: 삼성 인터넷 / Obsidian에서 텍스트 선택 → **Android 공유 시트** → **Secure Copy to ClipVault** 표시·저장 **PASS**. 기존 일반 **ClipVault** 대상과의 시트별 라벨 구분·기타 앱 범위 확대는 별도로 확인한다.
-- [ ] **Manual auth**: 잠긴 Vault에서 Save → strong biometric success 후 선택 문자열만 저장되는지; 취소·오류·unprovisioned는 미저장 확인.
-- [ ] **Manual no-clipboard**: **실기기 관측 범위 PASS** — Secure Copy 전후 system primary clip·Samsung Keyboard clipboard history 값 유지, 신규 Secure Copy 텍스트 미노출. 아직 Shizuku 캡처 이벤트 미발생의 독립 확인 및 모든 앱/경로에 대한 반복 검증은 미완료.
+- [x] **Manual auth (사용자 관측 범위)**: 잠긴 Vault에서 Save → strong biometric success 후 선택 문자열만 저장되는지; 취소·오류·unprovisioned는 미저장 확인.
+- [x] **Manual no-clipboard (시스템·삼성 기록 관측 범위만)**: **실기기 관측 범위 PASS** — Secure Copy 전후 system primary clip·Samsung Keyboard clipboard history 값 유지, 신규 Secure Copy 텍스트 미노출. 아직 Shizuku 캡처 이벤트 미발생의 독립 확인 및 모든 앱/경로에 대한 반복 검증은 미완료.
 - [ ] **Manual edge**: 개행/한국어/URL/코드, 긴 텍스트, read-only selection, 키보드·DeX·폰 화면 및 취소/잠금 중단.
 - [ ] **Security**: 앱 자체 `ClipboardManager.setPrimaryClip()` 호출 없음, 원래 캡처 정책과 분리, default permission 변화 없음.
 
@@ -72,6 +72,51 @@
 - **Edge 및 삼성 메시지: PASS** — 텍스트 선택 흐름에서 Secure Copy 메뉴 표시. 앞서 확인한 ChatGPT 경로에서도 표시·저장 성공.
 - **삼성 인터넷 및 Obsidian: PROCESS_TEXT 독립 팝업 노출 FAIL / Android ACTION_SEND 공유 시트 PASS** — One UI 앱 관리 허용 및 패키지 관리자 등록은 정상이며, 기본 텍스트 선택 팝업에는 독립 항목이 없지만 공유 시트에서는 Secure Copy 대상이 나타나고 저장된다. **공유 시트까지 미노출이라는 이전 기록을 정정**한다. 더 이상 공유 Intent 문제로 분류하지 않는다.
 - 남은 문제를 **앱별 PROCESS_TEXT 선택 팝업 노출 제한**으로만 분류한다. 현재 로그만으로 삼성 인터넷과 Obsidian의 내부 코드 구현이 동일하거나 One UI가 전역적으로 차단한다고 확정하지 않는다. 임의의 시스템 설정 변경·추가 권한으로 우회하려 하지 않는다.
+
+## 2026-10-31 삼성 S23 Ultra 실기기 재검증 / 폼팩터 차이
+
+사용자가 최신 WP-07A 실기기 구동에서 다음을 확인함. **검증 범위는 수행한 수동 케이스에 한정**하며 모든 장치·타이밍의 보안 보장을 의미하지 않음.
+
+| 체크 | 실기기 관측 | 판정 |
+| --- | --- | --- |
+| 1. 인증 성공/취소/실패 시 저장 결과 | 예상대로 인증·중단 동작 | **PASS (사용자 관측)** |
+| 2. Home/배경 전환/화면 꺼짐/잠금 중단 | 예상대로 저장 차단/중단 | **PASS (사용자 관측)** |
+| 3. 시스템 primary clip + 삼성 키보드 히스토리 비간섭 | 기존 값 유지, Secure Copy 텍스트 기록 미출현 | **PASS (사용자 관측)** |
+| 4. Shizuku bridge 이벤트 부재 | 수집 방법 미확보로 검증 불가 | **PENDING**, PASS 아님 |
+
+**직접 PROCESS_TEXT 선택 메뉴 노출(중요한 정정):**
+
+| 앱 | 스마트폰 화면 | Samsung DeX 화면 | 대체 진입점 |
+| --- | --- | --- | --- |
+| Samsung Internet | 텍스트 선택 → **…(더보기)** → **Secure Copy 표시** | 텍스트 선택 메뉴에서 **미표시** | 이전 실기기 검증에서 Android 공유 시트 **PASS** |
+| Obsidian | **미표시** | **미표시** | 이전 실기기 검증에서 Android 공유 시트 **PASS** |
+
+삼성 인터넷은 Android PROCESS_TEXT 자체를 전역 차단하는 앱이 **아니다**. 동일 앱의 화면 모드별 외부 액션 표시 차이까지 확인됨. 원인이 One UI의 DeX 메뉴 정책인지, 앱의 선택 메뉴 구현인지, 오버플로우/메뉴 제한인지는 미확정. Obsidian은 두 모드 모두 직접 팝업에서 미표시. **Android 공유 시트의 별도 Secure Copy 대상 기능과 직접 선택 메뉴 노출을 혼동하지 않는다.**
+
+### Shizuku clipboard-event 비간섭 계측 방법 (디버그 APK 전용)
+
+PR #19 후속 커밋의 `ClipboardCaptureService`는 **콘텐츠·해시·길이·시각 없이** 두 누적 숫자만 앱 private prefs에 쓴다.
+
+- `debug_bridge_event_count`: Shizuku Binder 리스너가 전달한 callback 수. `READY_EVENT`에서는 핵심 지표이며, `READY_POLL` 모드에서는 0인 것이 정상일 수 있다.
+- `debug_capture_accept_count`: 로컬 리스너·Shizuku 이벤트·Shizuku 폴링을 합쳐 중복 제거 후 capture()에 전달된 변경 텍스트 건수. **실제 SQLCipher 저장 건수나 이벤트 내용의 증거는 아님**.
+- `bridge_state`: `READY_EVENT` / `READY_POLL` / DEGRADED 등. 모드를 먼저 확인할 것.
+
+기존 데이터·서명을 유지하는 `scripts/deploy-debug.ps1`로 **해당 변경을 포함한 로컬 디버그 APK를 덮어 설치**한 뒤, 캡처를 ON 하고 다음 명령을 실행한다(Windows PowerShell).
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\device-validation-record.ps1 -OutFile .\wp07a-before.md
+# 1) 일반 Copy로 'WP07A-control-<임의 숫자>' 같은 무해하고 고유한 문자열을 복사한다.
+# 2) Shizuku bridge/capture counter가 증가하는지 확인한다. 증가하지 않으면
+#    이벤트 관측 장치가 준비되지 않았으므로 Secure Copy 무변화는 PASS가 아니다.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\device-validation-record.ps1 -OutFile .\wp07a-control.md
+# 3) 무해한 *다른* 문자열을 Secure Copy 저장한다. 일반 Copy를 섞지 않는다.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\device-validation-record.ps1 -OutFile .\wp07a-secure.md
+```
+
+각 파일의 `Bridge mode`, `Debug Shizuku listener events`, `Debug distinct clipboard captures` 수치와 증감 비교.
+`READY_EVENT`에서 일반 복사 시 이벤트 카운터가 증가하고 Secure Copy 동안 증가하지 않으면 **테스트 시간 동안 별도 Shizuku callback이 없었다는 관측**을 남길 수 있다. `READY_POLL`에서는 listener count가 의미 없고, 일반 Copy로 `capture_accept` 증가를 확인한 다음 Secure Copy 중 수치가 변하지 않는지 본다. 이때도 **변경된 클립보드 값이 중복 제거되었거나 폴링 간격 사이 잠시 생겼다가 지워졌을 가능성**이 있으므로, 이벤트 전부의 부재를 확정하지 않는다. 카운터가 증가하면 다른 앱 이벤트/기존 clipboard 변화 여부를 재점검하고 민감정보를 logcat에 노출하지 말 것.
+
+**금지:** 실기기에 `connectedDebugAndroidTest`, `adb uninstall`, `pm clear`를 실행하지 않는다. 일반 ClipVault 공유 대상은 별도 일반 capture 경로이므로 통제 실험에서 사용하지 않는다.
 
 ## Windows 데이터 보존형 설치
 
