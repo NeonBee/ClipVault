@@ -10,6 +10,20 @@ import android.content.Intent
 internal object SecureCopyRequest {
     const val MAX_SELECTED_CHARS = 128_000
 
+    /**
+     * Parse one explicit request and discard the original Intent's payload references.
+     * A retained Activity Intent is not a plaintext cache, including on invalid inputs.
+     */
+    fun consumeAndClear(intent: Intent?): String? {
+        val text = incomingText(intent)
+        intent?.removeExtra(Intent.EXTRA_PROCESS_TEXT)
+        intent?.removeExtra(Intent.EXTRA_TEXT)
+        intent?.removeExtra(Intent.EXTRA_STREAM)
+        intent?.clipData = null
+        intent?.data = null
+        return text
+    }
+
     fun incomingText(intent: Intent?): String? {
         if (intent == null || intent.type != "text/plain") return null
         // Mixed text + attachment/URI is not a pure-text secure ingress. Never
