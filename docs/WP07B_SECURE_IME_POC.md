@@ -47,7 +47,27 @@ Manual observation reported by the user, Galaxy S23 Ultra / One UI 8; not automa
 
 - Source page `clipvault_wp07ab_selectable_source.html`: **A** plain text + line breaks **PASS**; **B** plain-text URL **PASS**; **C** HTML `<a>` long-press *share link* → `No valid text` and no Secure Copy **(known ingress compatibility limitation, source Intent not captured)**; **C** selecting/dragg​ing the *visible URL text* and then using Secure Copy → **PASS**; **D** rich text lost bold/italic formatting, **expected text/plain behavior**. The comparison supports a difference in sharing action/payload rather than a generic URL-text failure. Do not claim the incoming share was definitely URI or a specific MIME type without measuring its metadata.
 - Destination page `clipvault_wp07b_field_test.html`: user reports **all HTML editor examples behaved as expected**. The page contains normal text and multiline areas (expected insert), password and number fields (expected PoC reject), read-only and disabled fields (expected no modification; keyboard may be unavailable), and a browser `contenteditable` area (compatibility exploration). **Overall manual expectation check PASS**; individual insert/skip results and browser version were not separately itemized, so do not upgrade all cases to individually instrumented security proofs.
-- This result is **not evidence** that the previously blocked **physical-keyboard / DeX IME panel visibility** issue is resolved. It remains **BLOCKED pending a separate explicit keyboard-connected retest**.
+- Earlier hardware-keyboard/DeX visibility was BLOCKED, but the later user report below observes a visible ClipVault on-screen IME panel in DeX. This **partially supersedes** the visibility blocker; do not mark the entire DeX/hardware-input matrix PASS because Korean physical-keyboard typing remains problematic.
 - Remaining cross-cutting gates: lock epoch, lifecycle/focus switches, direct clipboard non-interference with Shizuku positive control, editor switching and exactly-once insertion. No personal-device instrumentation/uninstall/clear-data.
+
+## User device follow-up — security gates PASS, DeX physical-keyboard Korean input issue (2026-10-31)
+
+Reported manually by the user on the Galaxy S23 Ultra / One UI 8. No raw keyboard events, editor package, keycodes, IME state dumps or log contents were collected.
+
+| Gate | Observed result | Assessment |
+| --- | --- | --- |
+| Secure Paste Shizuku clipboard-event non-interference | User states already checked, without unexpected events | **PASS (user-observed tested scope)**; raw before/after counters for this run not provided |
+| Lock and strong-biometric security boundary | User states already checked, no problem | **PASS (user-observed tested scope)**; not every lifecycle race independently enumerated |
+| Destination editor switching / wrong-target insertion | User reports no wrong-target paste | **PASS (user-observed tested scope)** |
+| DeX on-screen ClipVault IME visible while hardware keyboard connected | User reports the on-screen keyboard could be invoked in this configuration | **Visible in this tested state**; earlier 'IME unavailable with keyboard' report cannot be generalized across conditions |
+| Hardware keyboard Hangul input while on-screen IME is active in DeX | User reports forced English-only input | **OPEN: DeX/IME Korean typing limitation**, separate from Secure Paste direct-insert and clipboard security gates |
+
+**Code review and likely scope:** `SecurePasteImeService` registers as the active `InputMethodService`; its own search `EditText` uses `setShowSoftInputOnFocus(false)`, and there is no Hangul key-composition implementation. Therefore Korean hardware-key input cannot be assumed to work like Samsung Keyboard while ClipVault is the active IME. The report does not specify whether English-only characters appeared in the ClipVault search field or the target app's editor, so do not prematurely attribute the exact root cause to Samsung DeX or to a specific keyboard setting.
+
+**Safe reproduction/isolation:** With an ordinary disposable text editor in DeX, compare hardware keyboard Hangul output **(1)** while Samsung Keyboard is the selected IME, **(2)** while ClipVault Secure Paste IME is selected and visible, and **(3)** after successful Secure Paste and return to Samsung Keyboard. Note whether the active input field is ClipVault Search or the target editor, whether the 한/영 key and configured language-switch shortcuts work, and whether the IME picker/return is available. Do not log actual typed secrets.
+
+**Product decision:** WP-07B is a **retrieval-only** secondary IME, not an alternative Hangul-capable typing engine. For ordinary Korean hardware typing, switch back to Samsung Keyboard via the IME picker (or the existing successful-paste `switchToPreviousInputMethod()` path). Treat Korean search while ClipVault is active as a UX compatibility follow-up, **not as permission to record keys or implement a general keyboard**, and do not weaken system clipboard non-interference for a fallback.
+
+This DeX behavior is an **open usability limitation** even though the above three security gates have been observed to pass. Do not claim complete release readiness until remaining CI and device/keyboard matrix gates are addressed.
 
 Official API references: [Create an input method](https://developer.android.com/develop/ui/views/touch-and-input/creating-input-method), [InputMethodService](https://developer.android.com/reference/android/inputmethodservice/InputMethodService), [InputConnection](https://developer.android.com/reference/android/view/inputmethod/InputConnection).
