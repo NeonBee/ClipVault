@@ -102,7 +102,8 @@ class SecurePasteImeService : InputMethodService() {
         } else LinearLayout.LayoutParams.MATCH_PARENT
         root.addView(panel, LinearLayout.LayoutParams(panelWidth, LinearLayout.LayoutParams.WRAP_CONTENT))
 
-        // Identity + a clearly labeled return path to the regular keyboard.
+        // Identity stays above the results. On-screen IME switch controls are kept
+        // inside the bottom dock, never over the system gesture navigation bar.
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -127,35 +128,17 @@ class SecurePasteImeService : InputMethodService() {
             letterSpacing = 0.12f
             setTextColor(ui.accent)
         })
-        header.addView(identity, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-            marginStart = dp(10)
-        })
-        header.addView(actionText(getString(R.string.secure_paste_switch_keyboard), ui.text,
-            ui.surface, ui.outline).apply {
-            contentDescription = getString(R.string.secure_paste_switch_keyboard)
-            setOnClickListener { showPicker() }
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(40)))
+        header.addView(identity, LinearLayout.LayoutParams(0,
+            LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(10) })
+        header.addView(TextView(this).apply {
+            text = "●"
+            textSize = 12f
+            setTextColor(ui.accent)
+            contentDescription = getString(R.string.secure_paste_ime_label)
+            gravity = Gravity.CENTER
+            background = shape(ui.accentSurface, 16)
+        }, LinearLayout.LayoutParams(dp(30), dp(30)))
         panel.addView(header)
-
-        val footer = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(2), dp(8), dp(2), 0)
-        }
-        footer.addView(ImageView(this).apply {
-            setImageResource(android.R.drawable.ic_lock_lock)
-            imageTintList = ColorStateList.valueOf(ui.accent)
-            contentDescription = null
-        }, LinearLayout.LayoutParams(dp(14), dp(14)))
-        footer.addView(TextView(this).apply {
-            setText(R.string.secure_paste_private_footer)
-            textSize = 11f
-            setTextColor(ui.secondary)
-            setPadding(dp(7), 0, 0, 0)
-            maxLines = 2
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        panel.addView(footer, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
 
         status = TextView(this).apply {
             setTextColor(ui.secondary)
@@ -248,15 +231,6 @@ class SecurePasteImeService : InputMethodService() {
             marginStart = dp(7)
         }) }
         filters.addView(View(this), LinearLayout.LayoutParams(0, dp(1), 1f))
-        filters.addView(ImageView(this).apply {
-            setImageResource(android.R.drawable.ic_menu_rotate)
-            imageTintList = ColorStateList.valueOf(ui.secondary)
-            background = touchShape(ui.surface, 12, ui.outline)
-            setPadding(dp(10), dp(10), dp(10), dp(10))
-            contentDescription = getString(R.string.secure_paste_refresh)
-            isFocusable = true
-            setOnClickListener { refresh() }
-        }, LinearLayout.LayoutParams(dp(38), dp(38)))
         panel.addView(filters, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, dp(38)).apply { bottomMargin = dp(7) })
 
@@ -271,6 +245,47 @@ class SecurePasteImeService : InputMethodService() {
             addView(rows)
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(listHeight)))
 
+        // A separate 56dp dock BELOW the scrolling clip list. Both circular actions
+        // have equal dimensions; neither can cover the fourth item or the nav switcher.
+        // The OS-provided One UI keyboard switcher remains controlled by the system.
+        val dock = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(2), dp(7), dp(2), 0)
+        }
+        dock.addView(roundDockAction("⌨", R.string.secure_paste_switch_keyboard) {
+            showPicker()
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        dock.addView(LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            orientation = LinearLayout.VERTICAL
+            background = shape(ui.accentSurface, 16)
+            setPadding(dp(9), dp(7), dp(9), dp(7))
+            addView(TextView(this@SecurePasteImeService).apply {
+                text = getString(R.string.secure_paste_dock_status)
+                setTextColor(ui.accent)
+                textSize = 10f
+                typeface = Typeface.DEFAULT_BOLD
+                gravity = Gravity.CENTER
+                maxLines = 1
+            })
+            addView(TextView(this@SecurePasteImeService).apply {
+                setText(R.string.secure_paste_private_footer)
+                setTextColor(ui.secondary)
+                textSize = 10f
+                gravity = Gravity.CENTER
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
+        }, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            marginStart = dp(10)
+            marginEnd = dp(10)
+        })
+        dock.addView(roundDockAction("⟳", R.string.secure_paste_refresh) {
+            refresh()
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        panel.addView(dock, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(57)))
         updateFilters()
         return root
     }
@@ -523,6 +538,20 @@ class SecurePasteImeService : InputMethodService() {
     private fun touchShape(fill: Int, radiusDp: Int, border: Int? = null): RippleDrawable =
         RippleDrawable(ColorStateList.valueOf(ui.ripple),
             shape(fill, radiusDp, border), shape(Color.WHITE, radiusDp))
+
+    private fun roundDockAction(
+        label: String, description: Int, action: () -> Unit,
+    ): TextView = TextView(this).apply {
+        text = label
+        textSize = 24f
+        setTextColor(ui.accent)
+        gravity = Gravity.CENTER
+        contentDescription = getString(description)
+        isClickable = true
+        isFocusable = true
+        background = touchShape(ui.surface, 24, ui.outline)
+        setOnClickListener { action() }
+    }
 
     private fun actionText(label: String, color: Int, fill: Int, border: Int?): TextView =
         TextView(this).apply {
