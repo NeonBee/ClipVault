@@ -246,7 +246,7 @@ public final class ClipVaultApp extends Application {
             mainHandler.post(() -> {
                 if (autoLock != null) autoLock.onVaultUnlocked();
                 // Only notify observers if a later lock has not invalidated this unlock.
-                if (isUnlocked() && lockEpoch.get() == expectedEpoch) {
+                if (isUnlocked() && lockEpoch.get() == expectedLockEpoch) {
                     for (Runnable listener : vaultOpenedListeners) listener.run();
                 }
             });
