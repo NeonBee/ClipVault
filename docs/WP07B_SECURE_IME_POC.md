@@ -41,4 +41,13 @@ Status: **implementation PR / NOT device-certified / NOT a release guarantee**. 
 - Android `InputConnection` success is a request/acceptance signal only. The current implementation does not support rich text, read-only editors, password fields, numeric fields or automated clipboard comparisons.
 - The preceding WP-07A entry path still uses `ACTION_PROCESS_TEXT` or the explicit secure `ACTION_SEND` receiver. The IME is **egress-only**, not a general keyboard read/capture service.
 
+## User device follow-up — HTML editor matrix and hyperlink selection (2026-10-31)
+
+Manual observation reported by the user, Galaxy S23 Ultra / One UI 8; not automatically verified by CI.
+
+- Source page `clipvault_wp07ab_selectable_source.html`: **A** plain text + line breaks **PASS**; **B** plain-text URL **PASS**; **C** HTML `<a>` long-press *share link* → `No valid text` and no Secure Copy **(known ingress compatibility limitation, source Intent not captured)**; **C** selecting/dragg​ing the *visible URL text* and then using Secure Copy → **PASS**; **D** rich text lost bold/italic formatting, **expected text/plain behavior**. The comparison supports a difference in sharing action/payload rather than a generic URL-text failure. Do not claim the incoming share was definitely URI or a specific MIME type without measuring its metadata.
+- Destination page `clipvault_wp07b_field_test.html`: user reports **all HTML editor examples behaved as expected**. The page contains normal text and multiline areas (expected insert), password and number fields (expected PoC reject), read-only and disabled fields (expected no modification; keyboard may be unavailable), and a browser `contenteditable` area (compatibility exploration). **Overall manual expectation check PASS**; individual insert/skip results and browser version were not separately itemized, so do not upgrade all cases to individually instrumented security proofs.
+- This result is **not evidence** that the previously blocked **physical-keyboard / DeX IME panel visibility** issue is resolved. It remains **BLOCKED pending a separate explicit keyboard-connected retest**.
+- Remaining cross-cutting gates: lock epoch, lifecycle/focus switches, direct clipboard non-interference with Shizuku positive control, editor switching and exactly-once insertion. No personal-device instrumentation/uninstall/clear-data.
+
 Official API references: [Create an input method](https://developer.android.com/develop/ui/views/touch-and-input/creating-input-method), [InputMethodService](https://developer.android.com/reference/android/inputmethodservice/InputMethodService), [InputConnection](https://developer.android.com/reference/android/view/inputmethod/InputConnection).
