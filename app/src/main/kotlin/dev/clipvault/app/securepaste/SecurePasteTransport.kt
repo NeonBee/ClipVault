@@ -19,9 +19,11 @@ internal object SecurePasteTransport {
         expectedPackage: String?,
         inputType: Int,
         alreadyInserting: Boolean,
+        ownPackage: String? = null,
     ): Boolean {
         if (!vaultOpen || expectedEpoch != currentEpoch || deviceLocked || alreadyInserting) return false
-        if (editorPackage.isNullOrBlank() || editorPackage != expectedPackage) return false
+        if (editorPackage.isNullOrBlank() || editorPackage != expectedPackage ||
+            editorPackage == ownPackage) return false
         // PoC is intentionally restricted to ordinary text editors. TYPE_NULL requires raw key
         // events; numeric/phone/date and password fields need their own tested policies.
         if (inputType == EditorInfo.TYPE_NULL) return false
