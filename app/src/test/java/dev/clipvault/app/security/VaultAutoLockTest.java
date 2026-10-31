@@ -115,6 +115,60 @@ public class VaultAutoLockTest {
     }
 
     @Test
+    public void secureImeVisibleAfterLastActivityStoppedCancelsBackgroundTimeout() {
+        autoLock.onActivityStarted();             // Unlock foreground Activity.
+        autoLock.onActivityStopped(false);        // Target editor lives in another process.
+        assertTrue(scheduler.pending());
+        autoLock.onSecureImeVisibilityChanged(true);
+        assertFalse(scheduler.pending());
+        autoLock.onVaultUnlocked();               // Async biometric completion should not rearm.
+        assertFalse(scheduler.pending());
+    }
+
+    @Test
+    public void hidingImeStartsBackgroundCountdownOnlyWhenNoActivityIsVisible() {
+        autoLock.onSecureImeVisibilityChanged(true);
+        autoLock.onSecureImeVisibilityChanged(false);
+        assertTrue(scheduler.pending());
+        assertEquals(30_000L, scheduler.delay);
+        scheduler.fire();
+        assertEquals(1, locks.get());
+    }
+
+    @Test
+    public void hidingImeWhileClipVaultActivityRemainsOpenDoesNotLock() {
+        autoLock.onActivityStarted();
+        autoLock.onSecureImeVisibilityChanged(true);
+        autoLock.onSecureImeVisibilityChanged(false);
+        assertFalse(scheduler.pending());
+        autoLock.onActivityStopped(false);
+        assertTrue(scheduler.pending());
+    }
+
+    @Test
+    public void repeatedImeVisibilityCallbacksAreIdempotentAndExplicitLockStillWins() {
+        autoLock.onSecureImeVisibilityChanged(true);
+        autoLock.onSecureImeVisibilityChanged(true);
+        assertFalse(scheduler.pending());
+        // Immediate screen-off and manual-lock paths call lockVault, not the background timer.
+        unlocked.set(false);
+        autoLock.onVaultLocked();
+        autoLock.onSecureImeVisibilityChanged(false);
+        assertFalse(scheduler.pending());
+        autoLock.onSecureImeVisibilityChanged(false);
+        assertFalse(scheduler.pending());
+    }
+
+    @Test
+    public void backgroundCountdownIsCancelledWhenImeReappears() {
+        autoLock.onSecureImeVisibilityChanged(true);
+        autoLock.onSecureImeVisibilityChanged(false);
+        assertTrue(scheduler.pending());
+        autoLock.onSecureImeVisibilityChanged(true);
+        assertFalse(scheduler.pending());
+    }
+
+    @Test
     public void delayIsClampedToTheSupportedRange() {
         configuredDelay = 3_600_000L;
         autoLock.onActivityStarted();
