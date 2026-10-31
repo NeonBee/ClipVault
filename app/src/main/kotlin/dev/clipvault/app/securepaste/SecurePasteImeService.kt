@@ -62,7 +62,12 @@ class SecurePasteImeService : InputMethodService() {
     override fun onEvaluateFullscreenMode(): Boolean = false
 
     // A DeX hardware keyboard is not a reason to hide this retrieval-only IME surface.
-    override fun onEvaluateInputViewShown(): Boolean = true
+    override fun onEvaluateInputViewShown(): Boolean {
+        // Respect InputMethodService's required lifecycle evaluation even when a physical
+        // keyboard is present; this retrieval-only panel is intentionally always visible.
+        super.onEvaluateInputViewShown()
+        return true
+    }
 
     override fun onCreateInputView(): View {
         val root = LinearLayout(this).apply {
