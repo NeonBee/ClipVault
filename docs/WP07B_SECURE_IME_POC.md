@@ -70,4 +70,29 @@ Reported manually by the user on the Galaxy S23 Ultra / One UI 8. No raw keyboar
 
 This DeX behavior is an **open usability limitation** even though the above three security gates have been observed to pass. Do not claim complete release readiness until remaining CI and device/keyboard matrix gates are addressed.
 
+## WP-07B keyboard presentation refresh — UI/UX priority (2026-10-31)
+
+**Scope:** Visual and interaction polish of the existing retrieval-only InputMethodService. The direct-insert security boundary is unchanged; this does not implement a full keyboard or Hangul input engine.
+
+| Area | Updated behavior |
+| --- | --- |
+| Panel chrome | Distinct ClipVault identity, private-insert mode, and a visible **Keyboards** action |
+| Layout | Bounded **620dp** wide in broad DeX configurations; phone width follows viewport; result viewport scales with available screen height |
+| Search | 46dp rounded search field, icon, explicit clear action, preserved **hardware-only** keyboard search |
+| Navigation | Separate **Recent** / **Pinned** tabs with selected states and independent **Refresh** control |
+| Entries | Tap-to-insert full-width cards, readable single-line title + optional snippet, pinned marker and insert affordance; no system clipboard write |
+| Feedback | Locked / unavailable / loading / empty / failed / result-count states, clear unlock CTA, privacy footer |
+| Appearance | Native light/dark adaptive palette, clickable ripple surfaces, accessible control labels, no new UI dependencies |
+| Localization | All new IME strings translated for the app's existing Persian resource set, to avoid `MissingTranslation` lint regression |
+
+**Manual UI acceptance checks** (not yet device-certified for this revision):
+- [ ] Small phone landscape and portrait: no clipped **Keyboards**, **Unlock**, search clear, tabs or first result.
+- [ ] DeX narrow/wide windows and hardware keyboard connected: sane panel width, scroll and row taps.
+- [ ] Vault locked / biometric cancelled: no stale previews or query; only unlock is offered.
+- [ ] Pinned/Recent filtering, query clear, refresh, empty results and rapid taps; no duplicated text.
+- [ ] Dark theme and large font/accessibility scaling: sufficient contrast and tappable actions.
+- [ ] After successful insert, target receives plaintext once and the previous IME is restored or manual picker offered; system/Samsung clipboard unaffected.
+
+**Deliberate deferral:** User observed English-only hardware typing while the ClipVault IME is active in DeX. This is tracked separately as a typing/IME interoperability issue. This presentation refresh does not change hardware key handling or claim to resolve it. The safe workflow remains to switch back to Samsung Keyboard for normal Korean typing.
+
 Official API references: [Create an input method](https://developer.android.com/develop/ui/views/touch-and-input/creating-input-method), [InputMethodService](https://developer.android.com/reference/android/inputmethodservice/InputMethodService), [InputConnection](https://developer.android.com/reference/android/view/inputmethod/InputConnection).
