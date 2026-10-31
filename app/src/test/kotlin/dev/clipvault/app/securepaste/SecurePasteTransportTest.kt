@@ -13,9 +13,10 @@ class SecurePasteTransportTest {
     private fun permitted(type: Int = InputType.TYPE_CLASS_TEXT, epoch: Long = 12,
                           currentEpoch: Long = 12, vaultOpen: Boolean = true,
                           deviceLocked: Boolean = false, editor: String? = "example.editor",
-                          expected: String? = "example.editor", inserting: Boolean = false) =
+                          expected: String? = "example.editor", inserting: Boolean = false,
+                          ownPackage: String? = "dev.clipvault.app.debug") =
         SecurePasteTransport.permitted(
-            vaultOpen, epoch, currentEpoch, deviceLocked, editor, expected, type, inserting,
+            vaultOpen, epoch, currentEpoch, deviceLocked, editor, expected, type, inserting, ownPackage,
         )
 
     @Test fun allowsOrdinaryTextIncludingUrlAndMultilineTypes() {
@@ -32,6 +33,7 @@ class SecurePasteTransportTest {
         assertFalse(permitted(editor = "other.app"))
         assertFalse(permitted(expected = null))
         assertFalse(permitted(inserting = true))
+        assertFalse(permitted(ownPackage = "example.editor"))
     }
 
     @Test fun rejectsNullNumericPhoneDateAndPasswordFields() {
