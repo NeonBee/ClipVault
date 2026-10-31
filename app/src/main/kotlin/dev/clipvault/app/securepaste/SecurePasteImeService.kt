@@ -63,10 +63,17 @@ class SecurePasteImeService : InputMethodService() {
         unlockButton?.visibility = View.VISIBLE
     }
 
+    // The transparent biometric host never carries plaintext or editor references.
+    // Refresh only the still-visible, currently focused IME after a successful unlock.
+    private val vaultOpenedListener = Runnable {
+        if (imeWindowVisible && app.isUnlocked && !deviceLocked()) refresh()
+    }
+
     override fun onCreate() {
         super.onCreate()
         app = application as ClipVaultApp
         app.addLockListener(lockListener)
+        app.addVaultOpenedListener(vaultOpenedListener)
         window?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
 
@@ -341,6 +348,7 @@ class SecurePasteImeService : InputMethodService() {
         // onWindowHidden is not guaranteed before process/service teardown.
         updateImeVisibility(false)
         app.removeLockListener(lockListener)
+        app.removeVaultOpenedListener(vaultOpenedListener)
         clearSensitiveState()
         rows = null
         search = null
@@ -613,7 +621,10 @@ class SecurePasteImeService : InputMethodService() {
     }
 
     private fun openUnlockActivity() {
-        // Prompt belongs to a foreground FragmentActivity, never a service or a bypass key.
+        if (app.isUnlocked || deviceLocked()) return
+        // Preserve the visible IME panel. The only Activity is a 1px transparent
+        // BiometricPrompt host, not an additional full-page ClipVault screen.
+        status?.setText(R.string.secure_paste_authenticating)
         startActivity(Intent(this, SecurePasteUnlockActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
