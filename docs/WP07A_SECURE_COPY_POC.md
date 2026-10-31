@@ -1,6 +1,6 @@
 # WP-07A — Secure Copy PoC (Android text-selection ingress)
 
-**상태: PR #19 Draft — CI #113 verify/instrumentation SUCCESS (head `ec9941a`, 2026-10-31). Galaxy S23 Ultra / One UI 8 실기기에서 인증·중단·시스템/삼성 클립보드 비간섭(사용자가 테스트한 범위) PASS. 일반 Copy 양성 대조군 3회에서 Shizuku 원시 콜백 +3회씩, distinct capture +1회씩 관측했고 Secure Copy 3회에서 두 카운터 모두 변화 없음: 관측 범위의 Shizuku 비간섭 PASS. 다른 ROM/시점·검증하지 않은 경로에 일반화하지 않음. 삼성 인터넷 PROCESS_TEXT 메뉴는 폰 모드의 … 확장에서는 표시되나 DeX에서는 미표시; Obsidian은 두 모드 모두 미표시. 두 앱의 Secure Copy 공유 시트 대체 경로는 앞선 실기기 PASS.**
+**상태: PR #19 실기기 2개 Secure Copy 진입점 모두 독립 PASS (2026-10-31). CI #113 verify/instrumentation SUCCESS (head `ec9941a`). CI #114 verify SUCCESS / instrumentation FAILURE (별도 로그 분석 필요). Galaxy S23 Ultra / One UI 8 실기기에서 인증·중단·시스템/삼성 클립보드 비간섭(사용자가 테스트한 범위) PASS. 일반 Copy 양성 대조군 3회에서 Shizuku 원시 콜백 +3회씩, distinct capture +1회씩 관측했고 Secure Copy 3회에서 두 카운터 모두 변화 없음: 관측 범위의 Shizuku 비간섭 PASS. 이후 추가 검증에서 `ACTION_PROCESS_TEXT`와 보안 `ACTION_SEND`도 각각 독립적으로 Vault 저장·Shizuku 이벤트 증가 0·distinct capture 증가 0·시스템/삼성 키보드 기록 유지 모두 PASS. 다른 ROM/시점·검증하지 않은 앱에 일반화하지 않음. 삼성 인터넷 PROCESS_TEXT 메뉴는 폰 모드의 … 확장에서는 표시되나 DeX에서는 미표시; Obsidian은 두 모드 모두 미표시. 두 앱의 Secure Copy 공유 시트 대체 경로는 앞선 실기기 PASS.**
 
 [WP-07 설계](WP07_SECURE_TEXT_BOUNDARY.md)의 A 단계만 구현한다. B 단계의 IME / direct paste는 이 PR에 없다. Android 사용자가 앱 내부에서 텍스트를 길게 누르고 **텍스트 선택** → toolbar overflow의 **Secure Copy to ClipVault** 항목을 명시적으로 실행하거나, **공유** → **Secure Copy to ClipVault** 대상으로 명시적으로 보내는 경우에만 동작한다. 타사 앱이 컨텍스트 메뉴에 PROCESS_TEXT를 반드시 노출하는 것은 아니다.
 
@@ -30,7 +30,7 @@
 - [ ] **Manual edge**: 개행/한국어/URL/코드, 긴 텍스트, read-only selection, 키보드·DeX·폰 화면 및 취소/잠금 중단.
 - [ ] **Security**: 앱 자체 `ClipboardManager.setPrimaryClip()` 호출 없음, 원래 캡처 정책과 분리, default permission 변화 없음.
 
-**릴리스 금지 조건:** 위 Samsung clipboard non-interference 게이트를 통과하기 전까지 'Secure Copy bypasses the system clipboard'라는 사용자 대상 보안 주장을 완료로 표기하지 않는다. 다음 WP-07B Secure Paste는 별도 구현/리뷰다.
+**릴리스 문구 범위:** 타깃 실기기에서 `ACTION_PROCESS_TEXT` 및 보안 `ACTION_SEND` 각각의 Shizuku·시스템/삼성 키보드 클립보드 비간섭을 관측했으므로 이 검증 항목은 PASS다. 다만 모든 제조사/OS 및 모든 앱에서 비간섭을 보장한다는 식의 절대적 문구는 사용하지 않는다. 다음 WP-07B Secure Paste는 별도 구현/리뷰다.
 
 ## PR #19 병합 전 보안 강화 및 최종 게이트 (2026-10-30)
 
@@ -40,7 +40,7 @@
 - **자동 테스트:** 추가 unit은 비활성 요청의 precommit 거절을 검사한다. 추가 instrumentation은 텍스트와 STREAM/URI가 섞인 Intent를 거절하는지 확인한다. CI 통과는 UI/Intent 코드 경로 검증이지 모든 보안 타이밍/실기기 결과의 대체가 아니다.
 - **최신 이전 CI:** [#98](https://github.com/NeonBee/ClipVault/actions/runs/40999161835) verify/instrumentation SUCCESS (head `08cc4d6`). 최신 변경 커밋의 새 CI 결과를 별도로 확인한다.
 
-**병합 시 고려할 남은 검증 범위:** 실기기에서 인증 성공/취소·백그라운드 중단·시스템/삼성/클립보드 및 Shizuku 카운터 비간섭은 관측 범위 PASS. 다만 미등록 Vault, 모든 lock-epoch 경합 타이밍, 장문/모든 소스 앱, 양쪽 진입점별 전체 매트릭스 및 다른 ROM은 별도 검증이 필요하다. 원문 정규화(양끝 공백 제거·연속 개행 정리)는 현재 PoC의 알려진 한계로 유지한다.
+**병합 시 고려할 남은 검증 범위:** 실기기에서 인증 성공/취소·백그라운드 중단·시스템/삼성/클립보드 및 Shizuku 카운터 비간섭은 관측 범위 PASS. 양쪽 진입점의 독립 비간섭 검증도 PASS. 다만 미등록 Vault, 모든 lock-epoch 경합 타이밍, 장문/모든 소스 앱 및 다른 ROM은 별도 검증이 필요하다. 원문 정규화(양끝 공백 제거·연속 개행 정리)는 현재 PoC의 알려진 한계로 유지한다.
 
 ## Samsung DeX / One UI 8.0 selection-toolbar 실기기 관측 (2026-10-29)
 
@@ -108,7 +108,26 @@
 
 원시 리스너 카운터는 OS의 변경 콜백 **호출 횟수**이고 distinct 카운터는 `ClipboardCaptureCoordinator.accept()` 중복 제거 후 캡처 전달 횟수다. `+3/+1`은 한 번의 복사에 여러 콜백이 온다는 관측과 부합하지만, OS 알림 중복·리스너 등록 등 구체적인 3배 원인은 확정하지 않았다. 이 결과만으로 *모든* 장치·ROM에서 clipboard를 경유하지 않는다고 입증하거나 OS의 일시적 상태를 보장하지 않는다.
 
-**CI 상태:** [#113](https://github.com/NeonBee/ClipVault/actions/runs/41170793653)에서 `verify` 및 `instrumentation` 모두 SUCCESS (커밋 `ec9941a`). 본 문서 추가 이후 최신 HEAD의 CI는 별도로 확인한다.
+**CI 상태:** [#113](https://github.com/NeonBee/ClipVault/actions/runs/41170793653)에서 `verify` 및 `instrumentation` 모두 SUCCESS (커밋 `ec9941a`). 이후 [#114](https://github.com/NeonBee/ClipVault/actions/runs/41171281150)에서는 verify SUCCESS / instrumentation FAILURE가 관측됨. 이후 커밋의 CI 결과는 별도로 확인한다.
+
+### 2026-10-31 PROCESS_TEXT / 보안 ACTION_SEND 독립 진입점 검증 — 최종 추가 기록
+
+**사용자가 실제 기기에서 각각의 진입점으로 수행해 보고한 결과** (Galaxy S23 Ultra / One UI 8.0, WP-07A 디버그 빌드). 아래 두 경로는 기존의 "Secure Copy 3회 (경로 미구분)" 기록과 달리 명시적으로 구분됨.
+
+| 검증 항목 | `ACTION_PROCESS_TEXT` 선택 메뉴 직접 Secure Copy | 보안 `ACTION_SEND` 공유 시트 Secure Copy |
+| --- | --- | --- |
+| SQLCipher Vault에서 선택 문자열 저장 확인 | **PASS** | **PASS** |
+| `debug_bridge_event_count` 증가량 | **0 — PASS** | **0 — PASS** |
+| `debug_capture_accept_count` 증가량 | **0 — PASS** | **0 — PASS** |
+| 기존 Android system primary clipboard 유지 | **PASS** | **PASS** |
+| 기존 Samsung Keyboard clipboard history 유지 | **PASS** | **PASS** |
+| 경로별 실기기 결론 | **PASS (관측 범위)** | **PASS (관측 범위)** |
+
+실험에 사용한 **개별 소스 앱**, 실행별 **절대 카운터 시작/종료값**, 디바이스의 정밀 타임스탬프는 이번 사용자 보고에 없으므로 추측하여 기록하지 않는다. 다만 2개 경로를 각각 확인했다는 사실 및 경로별 각 체크의 PASS는 명시적으로 제공됨.
+
+앞서 별도 실험에서 일반 Copy를 반복할 때 raw listener events가 3→6→9, distinct captures가 3→4→5로 증가했으며, 이번 경로별 테스트에서는 Secure Copy가 두 계측값을 변화시키지 않았다. 이 양성 대조군은 해당 실기기의 수집 기능이 작동했음을 뒷받침한다. 다만 시간적으로 완전히 동일한 제어 실험이라고 주장하거나 모든 OS·IME·앱의 클립보드 동작까지 보증하지 않는다.
+
+**검증 판정:** WP-07A의 두 가지 보안 진입 경로에 대한 실기기 클립보드 비간섭 체크 **완료 (PASS, 대상 기기 및 테스트한 경로 한정)**. 일반 `ACTION_SEND`의 별도 `ClipVault` 대상은 일반 캡처 경로이므로 결과에 포함되지 않는다.
 
 ### 진단에 'debug capture 미실행 또는 구버전'이 표시될 때
 
