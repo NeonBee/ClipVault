@@ -188,7 +188,7 @@ class SecurePasteImeService : InputMethodService() {
         val isLocked = !app.isUnlocked || deviceLocked()
         val editorOk = info != null && SecurePasteTransport.permitted(
             app.isUnlocked, epoch, epoch, deviceLocked(), info.packageName,
-            activePackage, info.inputType, false,
+            activePackage, info.inputType, false, packageName,
         )
         if (isLocked || !editorOk) {
             clearResultsOnly()
@@ -248,7 +248,7 @@ class SecurePasteImeService : InputMethodService() {
         val info = currentInputEditorInfo
         val permitted = SecurePasteTransport.permitted(
             app.isUnlocked, sessionEpoch, app.lockEpoch(), deviceLocked(),
-            info?.packageName, activePackage, info?.inputType ?: EditorInfo.TYPE_NULL, inserting,
+            info?.packageName, activePackage, info?.inputType ?: EditorInfo.TYPE_NULL, inserting, packageName,
         )
         if (!permitted) {
             clearSensitiveState()
