@@ -88,9 +88,10 @@ class SecurePasteImeService : InputMethodService() {
             gravity = Gravity.CENTER_HORIZONTAL
             // Preserve editor-side hardware typing until the user explicitly taps Search.
             isFocusableInTouchMode = true
-            // One UI's bottom-left keyboard switcher can live inside the gesture-nav area.
-            // Keep the last tappable result clear of that zone even when nav bar insets are 0.
-            setPadding(dp(12), dp(10), dp(12), dp(28))
+            // One UI's bottom-left keyboard switcher can protrude above the black
+            // gesture-nav strip. Add 8dp to the manually verified 28dp bottom safe
+            // space so its symbol never visually touches the last clip row.
+            setPadding(dp(12), dp(10), dp(12), dp(36))
             setBackgroundColor(ui.background)
         }
         val panel = LinearLayout(this).apply {
