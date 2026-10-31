@@ -95,4 +95,21 @@ This DeX behavior is an **open usability limitation** even though the above thre
 
 **Deliberate deferral:** User observed English-only hardware typing while the ClipVault IME is active in DeX. This is tracked separately as a typing/IME interoperability issue. This presentation refresh does not change hardware key handling or claim to resolve it. The safe workflow remains to switch back to Samsung Keyboard for normal Korean typing.
 
+## WP-07B One UI device findings — background auto-lock and gesture-navigation overlap (2026-10-31)
+
+After the initial UI refresh, user reported two regressions on an actual Galaxy S23 Ultra / One UI 8:
+
+1. **Secure Paste panel left visibly open for about 30 seconds auto-locks the Vault.** Root cause in code: `VaultAutoLock` counted started `Activity` instances, but `SecurePasteImeService` runs as an Android service in the foreground editor of another app. Last ClipVault Activity stops -> timer fires despite visible IME. **Fix:** idempotent IME window-visible signal from `onWindowShown`/`onWindowHidden`/service teardown to `ClipVaultApp` -> `VaultAutoLock`. While the IME is shown, only *background* timeout is suppressed; hiding the last visible ClipVault UI schedules the configured background delay again. **Immediate screen-off lock, explicit lock, biometric/epoch checks and clipboard isolation remain unchanged.** Unit tests added for visibility, delayed unlock, repeated callbacks, screen-off-style lock and reappearance.
+2. **With One UI gesture navigation, the bottom-left system keyboard switcher overlays the small “Direct to editor ...” privacy footer.** **Fix:** move the footer directly under the ClipVault title/header and leave bottom safe breathing room (28dp) after the result list. Never attempt to cover, hide or intercept the system keyboard switcher or gesture area. A Samsung/Android navigation bar inset may be OEM-specific; require actual device layout verification.
+
+**Post-fix manual gates (pending, do not infer PASS from implementation):**
+- [ ] Unlock and leave ClipVault Secure Paste IME **visible** for >45s; Vault stays unlocked while the screen remains on, editor is active and panel visible.
+- [ ] Switch to Samsung Keyboard or hide IME, leave all ClipVault Activities backgrounded; configured 30s auto-lock triggers.
+- [ ] While IME remains visible, screen-off/lock button → immediate Vault lock; returning requires strong biometric unlock; no plaintext remnants.
+- [ ] Biometric reauthentication after locking and repeat show/hide cycles do not cause stale timers or duplicate locks.
+- [ ] One UI **gesture** mode: system bottom-left keyboard chooser remains unobscured; footer appears near header, last card remains tappable; compare with three-button navigation and DeX.
+- [ ] Re-check exactly-once direct `InputConnection.commitText` insertion, Shizuku Δ0, and unchanged Samsung/system clipboard data.
+
+**No data migration**, no change to secure text ingress or clipboard transport. Physical-keyboard DeX Hangul limitation remains separately deferred.
+
 Official API references: [Create an input method](https://developer.android.com/develop/ui/views/touch-and-input/creating-input-method), [InputMethodService](https://developer.android.com/reference/android/inputmethodservice/InputMethodService), [InputConnection](https://developer.android.com/reference/android/view/inputmethod/InputConnection).
