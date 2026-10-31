@@ -112,4 +112,16 @@ After the initial UI refresh, user reported two regressions on an actual Galaxy 
 
 **No data migration**, no change to secure text ingress or clipboard transport. Physical-keyboard DeX Hangul limitation remains separately deferred.
 
+## One UI final review of first visual polish pass (2026-10-31)
+
+**User-reported PASS, existing build before final spacing adjustment:**
+
+- [x] Secure Paste IME left visible for >45 seconds did **not** auto-lock unexpectedly.
+- [x] On leaving IME / returning to normal keyboard, the configured background auto-lock resumed and screen-off lock remained effective.
+- [x] Gesture-navigation system keyboard chooser no longer overlapped the relocated privacy footer; user accepted the improved UI.
+
+**Final small visual follow-up:** One UI gesture-mode dark navigation strip was still approximately one symbol-height shy of a clean bottom boundary. The IME root's minimum bottom breathing space was increased **28dp → 36dp (+8dp)**, with no change to system navigation controls or secure paste behavior. This precise spacing revision is **awaiting one real-device visual confirmation**; do not mark it independently PASS yet.
+
+**Hardware keyboard focus routing:** With a physical keyboard connected and ClipVault IME visible, user observed keystrokes appearing in the browser **address bar** instead of ClipVault's intended search. Kept as a **distinct OPEN, deferred follow-up**, documented in [WP07B_HARDWARE_KEYBOARD_FOCUS_FOLLOWUP.md](WP07B_HARDWARE_KEYBOARD_FOCUS_FOLLOWUP.md). GitHub Issue creation was attempted but this repository has **Issues disabled (HTTP 410)**; the document and PR discussion are the tracking record. No assumption about root cause, browser implementation or exact focus path; separate from prior DeX Hangul composition limitation.
+
 Official API references: [Create an input method](https://developer.android.com/develop/ui/views/touch-and-input/creating-input-method), [InputMethodService](https://developer.android.com/reference/android/inputmethodservice/InputMethodService), [InputConnection](https://developer.android.com/reference/android/view/inputmethod/InputConnection).
