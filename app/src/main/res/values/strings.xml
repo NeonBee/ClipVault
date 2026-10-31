@@ -210,6 +210,7 @@
 
     <!-- WP-07B: secondary, retrieval-only secure IME. -->
     <string name="secure_paste_dock_status">SECURE PASTE</string>
+    <string name="secure_paste_authenticating">Authenticating with strong biometrics…</string>
     <string name="secure_paste_ime_label">ClipVault Secure Paste</string>
     <string name="secure_paste_panel_subtitle">PRIVATE INSERT</string>
     <string name="secure_paste_private_footer">Direct to editor · never the system clipboard</string>
