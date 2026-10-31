@@ -34,5 +34,8 @@ class SecurePasteImeManifestTest {
             0,
         )
         assertFalse(unlock.exported)
+        // The foreground FragmentActivity is visually transparent. BiometricPrompt still
+        // owns the actual strong-biometric prompt; it is not moved into IME service.
+        assertEquals(dev.clipvault.app.R.style.Theme_ClipVault_SecureImeUnlock, unlock.theme)
     }
 }
