@@ -85,6 +85,8 @@ class SecurePasteImeService : InputMethodService() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
+            // Preserve editor-side hardware typing until the user explicitly taps Search.
+            isFocusableInTouchMode = true
             setPadding(dp(12), dp(10), dp(12), dp(12))
             setBackgroundColor(ui.background)
         }
