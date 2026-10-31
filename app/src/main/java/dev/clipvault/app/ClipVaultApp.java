@@ -60,6 +60,10 @@ public final class ClipVaultApp extends Application {
     public static final String PREF_LAST_CAPTURE_ERROR = "last_capture_error";
     /** BridgeHealth.stateCode() of the running capture service; empty when it is stopped. */
     public static final String PREF_BRIDGE_STATE = "bridge_state";
+    /** Debug validation only: raw Shizuku callbacks; no text, hashes or clip metadata. */
+    public static final String PREF_DEBUG_BRIDGE_EVENTS = "debug_bridge_event_count";
+    /** Debug validation only: distinct clipboard values passed to capture(); no contents. */
+    public static final String PREF_DEBUG_CAPTURE_ACCEPTS = "debug_capture_accept_count";
     public static final String PREF_AUTO_LOCK_MS = "auto_lock_ms";
     /** VaultLockLog: sanitized recent lock reasons, newest first. */
     public static final String PREF_LOCK_LOG = "lock_log";
