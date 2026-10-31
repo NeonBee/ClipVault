@@ -145,6 +145,19 @@ public final class ClipVaultApp extends Application {
         }, new IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_EXPORTED);
     }
 
+    /**
+     * Called on the main thread from ClipVault's own secure IME window lifecycle.
+     * A visible, explicitly selected IME is foreground Vault UI even while the
+     * editor Activity belongs to another package. This only pauses the BACKGROUND
+     * timeout; screen-off and explicit lock still invalidate the vault immediately.
+     */
+    public void onSecureImeVisibilityChanged(boolean visible) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            throw new IllegalStateException("IME visibility updates must run on the main thread");
+        }
+        if (autoLock != null) autoLock.onSecureImeVisibilityChanged(visible);
+    }
+
     /** Listeners run on the main thread after the vault has been marked locked. */
     public void addLockListener(@NonNull Runnable listener) {
         lockListeners.add(listener);
