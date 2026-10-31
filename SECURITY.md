@@ -32,7 +32,7 @@ There is intentionally no recovery key, server escrow or bypass. Losing or inval
 - Likely OTP, password/token phrases and payment numbers are skipped by default.
 - Lock diagnostics keep only reason codes, timestamps and device-state flags for the last 8 locks; no clipboard content, search text or key material. Samsung DeX detection is used for diagnostics only and never as an authentication factor.
 
-## Planned secure text path
+## Secure text roadmap (WP-07A PoC; WP-07B planned)
 
 WP-07 defines an optional path for sensitive text that avoids the Android/system clipboard in both directions:
 
@@ -41,7 +41,7 @@ WP-07 defines an optional path for sensitive text that avoids the Android/system
 
 This path is intentionally designed without Accessibility Service, Samsung Keyboard hooks, arbitrary UI injection or a new network boundary. Samsung Keyboard remains the normal primary IME; ClipVault's planned IME is an on-demand retrieval surface only.
 
-WP-07 is a **planned design, not a current release guarantee**. Until its clipboard non-interference tests pass, users must assume that the existing normal Copy/QuickPaste restore path exposes plaintext to the system clipboard.
+WP-07A has a **draft PoC implementation** of explicit `ACTION_PROCESS_TEXT` selection ingress and a separately labeled `ACTION_SEND` Secure Copy share-sheet target. Both require user confirmation and use the existing unlocked SQLCipher vault; the original MainActivity `ACTION_SEND` target still uses **normal capture/staging** and is not an implicit secure fallback. The secure receiver accepts bounded plain text, rejects mixed URI/stream inputs, and does not call the system clipboard. An in-flight request is rechecked for cancellation, lock epoch and device-lock state immediately before its database insert; once the actual insert starts, cancellation cannot guarantee rollback. On Galaxy S23 Ultra / One UI 8.0 the user observed successful secure saves and unchanged Android clipboard/Samsung Keyboard history for the tested selection and secure-share routes (**PASS within the tested scope**). This is **not** proof of Shizuku-event absence, biometric cancellation/background/lock race safety across all timings, or compatibility across devices and apps; these remain release gates. WP-07B Secure Paste/IME is not implemented. Normal Copy/QuickPaste restore **still places plaintext on the Android system clipboard**.
 
 See [docs/WP07_SECURE_TEXT_BOUNDARY.md](docs/WP07_SECURE_TEXT_BOUNDARY.md), [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md), and the [WP-06 implementation/verification boundary](docs/WP06_COMPLETION.md).
 

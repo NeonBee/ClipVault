@@ -42,6 +42,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.security.GeneralSecurityException;
 
 public final class ClipVaultApp extends Application {
@@ -59,6 +60,10 @@ public final class ClipVaultApp extends Application {
     public static final String PREF_LAST_CAPTURE_ERROR = "last_capture_error";
     /** BridgeHealth.stateCode() of the running capture service; empty when it is stopped. */
     public static final String PREF_BRIDGE_STATE = "bridge_state";
+    /** Debug validation only: raw Shizuku callbacks; no text, hashes or clip metadata. */
+    public static final String PREF_DEBUG_BRIDGE_EVENTS = "debug_bridge_event_count";
+    /** Debug validation only: distinct clipboard values passed to capture(); no contents. */
+    public static final String PREF_DEBUG_CAPTURE_ACCEPTS = "debug_capture_accept_count";
     public static final String PREF_AUTO_LOCK_MS = "auto_lock_ms";
     /** VaultLockLog: sanitized recent lock reasons, newest first. */
     public static final String PREF_LOCK_LOG = "lock_log";
@@ -353,6 +358,35 @@ public final class ClipVaultApp extends Application {
         public UnlockInterruptedException() {
             super("The vault was locked while unlocking");
         }
+    }
+
+    /**
+     * WP-07A: explicit user-selected text ingress, never the background capture/staging path.
+     * Caller MUST run on the app's serialized IO executor, after the user confirms the action.
+     * No sensitive-text skip heuristic is applied to a deliberate explicit secure save.
+     *
+     * Lock epoch and SQLCipher insertion are guarded together so no insert starts after lockVault().
+     * No raw text appears in notifications, preferences, capture diagnostics or clipboard events.
+     */
+    public boolean saveExplicitSecureText(@NonNull String rawText, long expectedLockEpoch,
+                                          @NonNull BooleanSupplier requestActive) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            throw new IllegalStateException("Secure text storage must run off the main thread");
+        }
+        if (rawText.trim().isEmpty() || rawText.length() > 128_000) return false;
+        boolean inserted;
+        synchronized (lockEpoch) {
+            // The UI may have been cancelled or backgrounded while this operation was queued.
+            // Re-check its volatile cancellation token immediately before a durable write,
+            // in the same lock-epoch critical section as the insertion.
+            if (!requestActive.getAsBoolean() || !unlocked
+                    || lockEpoch.get() != expectedLockEpoch || repository == null) return false;
+            KeyguardManager keyguard = getSystemService(KeyguardManager.class);
+            if (keyguard == null || keyguard.isDeviceLocked()) return false;
+            inserted = repository.insert(rawText, System.currentTimeMillis()) > 0;
+        }
+        if (inserted) notifyDataChanged();
+        return inserted;
     }
 
     public void capture(@NonNull String rawText, long createdAt) {

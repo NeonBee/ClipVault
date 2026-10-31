@@ -198,4 +198,13 @@
     <string name="unlock_interrupted">The vault was locked while unlocking. Authenticate again.</string>
     <string name="recent_locks">Recent locks</string>
     <string name="lock_at">Lock %1$s</string>
+    <!-- WP-07A: never display the selected source text in the ingress UI. -->
+    <string name="secure_copy_title">Secure Copy to ClipVault</string>
+    <string name="secure_copy_share_title">Secure Copy to ClipVault</string>
+    <string name="secure_copy_explanation">Save selected or shared text directly to your encrypted vault without copying it to the Android clipboard. Unlock with strong biometrics if needed.</string>
+    <string name="secure_copy_save">Save securely</string>
+    <string name="secure_copy_working">Authenticating or saving…</string>
+    <string name="secure_copy_invalid">No valid text selection was provided. Nothing was saved.</string>
+    <string name="secure_copy_failed">Secure save was not completed. No clipboard fallback was used.</string>
+    <string name="secure_copy_saved">Saved to encrypted vault</string>
 </resources>

@@ -41,11 +41,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.PROCESS_TEXT" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
+
             <!-- Freeform (DeX) window floor only; phones ignore <layout>. Without it the main window
                  can be resized until the library shows filter chips but no clip, and until the four
                  top bar actions overflow. The floor is the smallest usable vault viewport: top bar
@@ -55,6 +51,33 @@
             <layout
                 android:minHeight="384dp"
                 android:minWidth="320dp" />
+        </activity>
+
+        <!-- WP-07A: user-confirmed encrypted ingress for two explicit source integrations.
+             PROCESS_TEXT: selection toolbar on supporting apps.
+             SEND: distinct "Secure Copy to ClipVault" share-sheet target (not Main's legacy
+             "ClipVault" share receiver, which continues to use normal capture/staging).
+             Both require foreground confirmation and existing strong-biometric Vault unlock.
+             No system clipboard write, pending staging or automatic fallback. -->
+        <activity
+            android:name=".securecopy.SecureCopyActivity"
+            android:label="@string/secure_copy_title"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:autoRemoveFromRecents="true"
+            android:taskAffinity="${applicationId}.securecopy">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <!-- Separate from MainActivity's legacy ACTION_SEND target. A user must select
+                 this specifically labeled secure target; do not auto-route normal shares. -->
+            <intent-filter android:label="@string/secure_copy_share_title">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <!-- Unexported: reached only through ClipVault's own launcher shortcut. Separate task, no recents

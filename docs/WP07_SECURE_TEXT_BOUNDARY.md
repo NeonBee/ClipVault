@@ -1,6 +1,6 @@
 # WP-07 Secure Text Boundary
 
-상태: **Decision / Planned — not implemented yet**
+상태: **WP-07A Secure Copy (PROCESS_TEXT 및 별도 ACTION_SEND 공유 대상) Draft 구현·CI #98 PASS; Galaxy S23 Ultra / One UI 8.0에서 두 진입 경로의 저장·클립보드 비간섭 일부 PASS. 인증 취소/잠금 경합·Shizuku 캡처 이벤트 부재 등 보안 게이트는 미완료. WP-07B~D 미구현.** [WP-07A 구현/검증 가이드](WP07A_SECURE_COPY_POC.md) 참조.
 
 이 문서는 ClipVault가 단순한 encrypted clipboard history를 넘어, 민감한 텍스트가 가능한 한 Android/System clipboard를 통과하지 않고 vault에 들어오고 나가도록 하는 보안 경계와 UX 방향을 고정한다.
 
@@ -82,13 +82,13 @@ SQLCipher
 
 요구사항:
 
-- `android.intent.action.PROCESS_TEXT` / `text/plain` 기반의 명시적인 사용자 동작만 처리한다.
+- `android.intent.action.PROCESS_TEXT` / `text/plain` 선택 메뉴와 명시적 `ACTION_SEND` / `text/plain` **Secure Copy** 공유 대상만 처리한다. 기존 MainActivity 일반 공유 대상은 별도이며, 사용자의 의사 없이 이를 Secure Copy로 재라우팅하지 않는다.
 - 선택 텍스트를 system clipboard에 쓰지 않는다.
 - clipboard capture pipeline을 우회하므로 같은 텍스트가 Samsung/Android clipboard history에 생성되어서는 안 된다.
 - vault가 잠긴 경우 durable write 전에 기존 strong-biometric unlock boundary를 거친다.
 - secure-ingress 전용으로 별도의 silent persistence 경로를 추가하지 않는다. locked-state staging 재사용 여부는 별도 보안 결정 없이 자동 확대하지 않는다.
 - Activity/task 흔적, 로그, notification, saved-state에 평문을 남기지 않는다.
-- source app이 `PROCESS_TEXT`를 제공하지 않거나 자체 selection UI를 쓰는 경우 이 기능을 강제하지 않는다.
+- source app이 `PROCESS_TEXT`를 제공하지 않거나 자체 selection UI를 쓰는 경우 이 기능을 강제하지 않는다. 사용자가 지원되는 앱의 공유 메뉴에서 **Secure Copy to ClipVault**를 명시적으로 선택할 수 있다.
 
 ### 3.2 Secure Paste — direct egress
 
@@ -260,7 +260,7 @@ Secure Copy 또는 Secure Paste 시 다음을 모두 확인해야 한다.
 
 ## 9. 현재 구현과의 관계
 
-이 문서는 **결정사항과 다음 구현 경계**를 정의한다. 작성 시점의 ClipVault는 아직 WP-07 Secure Copy/Secure Paste를 구현하지 않았다.
+이 문서는 **보안 설계와 미완료 보안 검증 게이트**를 정의한다. WP-07A Secure Copy PoC는 `feature/wp07a-secure-copy-poc` 구현 PR에서 검증 중이다. 타깃 기기의 선택·공유 경로에서 clipboard non-interference가 관측됐으나, 별도 Shizuku 이벤트 부재 및 인증 취소·잠금/백그라운드 경합 등 미완료 게이트가 있으므로 출시 수준의 보안 기능으로 아직 주장하지 않는다. **WP-07B Secure Paste / IME는 아직 미구현이다.**
 
 현재 구현의 copy-back 경로는 계속 system clipboard를 사용하므로, 그 경로에 대해서는 "ClipVault encrypted storage에서 안전하게 보관된다"는 주장과 "clipboard로 내보낸 뒤에도 ClipVault가 기밀성을 보장한다"는 주장을 구분해야 한다.
 

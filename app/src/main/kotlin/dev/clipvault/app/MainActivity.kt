@@ -136,7 +136,6 @@ class MainActivity : AppCompatActivity() {
     private fun handleIncomingText(intent: Intent?) {
         val text = when (intent?.action) {
             Intent.ACTION_SEND -> intent.getCharSequenceExtra(Intent.EXTRA_TEXT)
-            Intent.ACTION_PROCESS_TEXT -> intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
             else -> null
         }?.toString()?.trim().orEmpty()
         if (text.isNotEmpty()) {

@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 import dev.clipvault.app.ClipVaultApp;
+import dev.clipvault.app.BuildConfig;
 import dev.clipvault.app.security.VaultLockLog;
 import dev.clipvault.app.MainActivity;
 import dev.clipvault.app.R;
@@ -24,6 +25,7 @@ import dev.clipvault.app.R;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class ClipboardCaptureService extends Service {
     public static final String ACTION_START = "dev.clipvault.app.capture.START";
@@ -36,6 +38,8 @@ public final class ClipboardCaptureService extends Service {
     private ClipboardManager clipboardManager;
     private ShizukuController shizukuController;
     private ClipboardCaptureCoordinator coordinator;
+    private AtomicLong debugBridgeEvents;
+    private AtomicLong debugCaptureAccepts;
 
     private final ClipboardManager.OnPrimaryClipChangedListener localListener = this::captureLocalClipboard;
 
@@ -43,17 +47,38 @@ public final class ClipboardCaptureService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
+        if (BuildConfig.DEBUG) {
+            android.content.SharedPreferences prefs =
+                    getSharedPreferences(ClipVaultApp.PREFS, MODE_PRIVATE);
+            debugBridgeEvents = new AtomicLong(prefs.getLong(ClipVaultApp.PREF_DEBUG_BRIDGE_EVENTS, 0L));
+            debugCaptureAccepts = new AtomicLong(prefs.getLong(ClipVaultApp.PREF_DEBUG_CAPTURE_ACCEPTS, 0L));
+            // A first-time capture session can legitimately receive zero events. Persist
+            // the baseline now so the device record distinguishes '0 observed' from
+            // 'counter absent / old APK / service not started'.
+            prefs.edit()
+                    .putLong(ClipVaultApp.PREF_DEBUG_BRIDGE_EVENTS, debugBridgeEvents.get())
+                    .putLong(ClipVaultApp.PREF_DEBUG_CAPTURE_ACCEPTS, debugCaptureAccepts.get())
+                    .apply();
+        }
         clipboardManager = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         clipboardManager.addPrimaryClipChangedListener(localListener);
         coordinator = new ClipboardCaptureCoordinator(
-                text -> ((ClipVaultApp) getApplication()).capture(text, System.currentTimeMillis()),
+                text -> {
+                    // Count distinct accepted clipboard values, not their text or fingerprints.
+                    recordDebugCounter(ClipVaultApp.PREF_DEBUG_CAPTURE_ACCEPTS, debugCaptureAccepts);
+                    ((ClipVaultApp) getApplication()).capture(text, System.currentTimeMillis());
+                },
                 error -> recordCaptureError(BridgeHealth.of(BridgeHealth.State.READY_POLL)
                         .withError(error).diagnosticCode()));
         shizukuController = new ShizukuController(this, health -> {
             recordCaptureError(health.diagnosticCode());
             recordBridgeState(health.stateCode());
             updateNotification();
-        }, coordinator::accept);
+        }, text -> {
+            // This is a real Binder listener delivery, not an inferred change from polling.
+            recordDebugCounter(ClipVaultApp.PREF_DEBUG_BRIDGE_EVENTS, debugBridgeEvents);
+            coordinator.accept(text);
+        });
         shizukuController.start();
         poller = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "shizuku-clipboard-poller");
@@ -85,6 +110,17 @@ public final class ClipboardCaptureService extends Service {
             startForeground(NOTIFICATION_ID, notification);
         }
         return START_STICKY;
+    }
+
+    /**
+     * Read-only verification via run-as + device-validation-record.ps1.
+     * The debug counter contains no plaintext, hashes, timestamps or clipboard sizes.
+     * It is absent from release builds and is not exposed via an exported component.
+     */
+    private void recordDebugCounter(String key, AtomicLong counter) {
+        if (!BuildConfig.DEBUG || counter == null) return;
+        getSharedPreferences(ClipVaultApp.PREFS, MODE_PRIVATE).edit()
+                .putLong(key, counter.incrementAndGet()).apply();
     }
 
     /** Stores a sanitized state identifier only; clipboard text never reaches preferences or logs. */
