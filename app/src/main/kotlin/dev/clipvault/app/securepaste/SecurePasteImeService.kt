@@ -340,25 +340,24 @@ class SecurePasteImeService : InputMethodService() {
             systemNavAccents?.invalidate()
             return
         }
-        val imeWindow = window?.window ?: return
-        val decor = imeWindow.decorView as? FrameLayout ?: return
-        imeWindow.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-        imeWindow.navigationBarColor = Color.TRANSPARENT
-        imeWindow.isNavigationBarContrastEnforced = false
+        val decor = window?.window?.decorView as? FrameLayout ?: return
+        // On AOSP/compatible One UI builds the IME navigation bar is itself a
+        // FrameLayout: place the backing at child index zero, directly BEHIND
+        // the two real platform buttons (never as a sibling overlay on top).
+        //
+        // This framework class is internal; we only inspect its runtime name
+        // and never invoke hidden methods. If Samsung changes the hierarchy,
+        // fail safely: no ovals, original native buttons remain untouched.
+        val systemNavFrame = (0 until decor.childCount).map { decor.getChildAt(it) }
+            .firstOrNull {
+                it.javaClass.name == "android.inputmethodservice.navigationbar.NavigationBarFrame"
+            } as? FrameLayout ?: return
 
         val accents = ImeNavPillsView(this, ui.accent, ui.surface)
         accents.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         accents.isClickable = false
         accents.isFocusable = false
-        // In AOSP the navigation button frame is above normal decor children.
-        // Insert immediately before it when present, so the actual OS glyphs
-        // remain on top and the decorations never replace their touch targets.
-        val osNavIndex = (0 until decor.childCount).firstOrNull { index ->
-            decor.getChildAt(index).javaClass.name ==
-                "android.inputmethodservice.navigationbar.NavigationBarFrame"
-        }
-        val position = osNavIndex ?: decor.childCount
-        decor.addView(accents, position, FrameLayout.LayoutParams(
+        systemNavFrame.addView(accents, 0, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT,
         ))
