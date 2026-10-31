@@ -8,7 +8,7 @@ import android.graphics.RectF
 import android.os.Build
 import android.view.View
 import android.view.WindowInsets
-import kotlin.math.max
+import kotlin.math.min
 
 /**
  * A non-interactive visual backing for the two native IME navigation glyphs.
@@ -48,22 +48,23 @@ internal class ImeNavPillsView(
         super.onDraw(canvas)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || width == 0 || height == 0) return
         val insets = rootWindowInsets ?: return
-        if (!insets.isVisible(WindowInsets.Type.navigationBars())) return
+        if (!insets.isVisible(WindowInsets.Type.navigationBars()) &&
+            !insets.isVisible(WindowInsets.Type.captionBar())) return
         // In 3-button mode the gesture region is typically absent. Do not draw
         // decorative ovals under unfamiliar navigation layouts.
         if (insets.getInsets(WindowInsets.Type.systemGestures()).bottom < dp(8f)) return
-        val navHeight = max(
-            insets.getInsets(WindowInsets.Type.navigationBars()).bottom,
-            insets.getInsets(WindowInsets.Type.captionBar()).bottom,
-        ).toFloat()
-        if (navHeight < dp(28f) || navHeight > dp(110f)) return
+        // This View is a child of the system-owned IME nav frame itself. The nav
+        // inset can be smaller than this frame on One UI, so use the actual
+        // frame's measured height when centering the background ovals.
+        val navHeight = height.toFloat()
+        if (navHeight < dp(20f) || navHeight > dp(110f)) return
 
         val geometry = ImeNavPillGeometry.forNavigationBar(
             widthPx = width.toFloat(),
             heightPx = height.toFloat(),
             navHeightPx = navHeight,
             pillWidthPx = dp(54f),
-            pillHeightPx = dp(34f),
+            pillHeightPx = min(dp(34f), navHeight * 0.62f),
         )
         for (pill in geometry) {
             area.set(pill.left, pill.top, pill.right, pill.bottom)
