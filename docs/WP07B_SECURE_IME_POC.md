@@ -145,4 +145,27 @@ After the initial UI refresh, user reported two regressions on an actual Galaxy 
 - [ ] Verify target correct, insertion exactly once; system clipboard/Samsung history unchanged, Shizuku listener/capture delta zero.
 - [ ] IME shown >45s does not trigger background auto-lock; hide IME → configured auto-lock resumes, screen-off still immediate.
 
+## WP-07B One UI gesture-navigation correction — native glyphs, no duplicate dock (2026-11-01)
+
+**Reference:** User-supplied external-device photograph of the actual S23 Ultra/One UI 8 IME bottom region. The image shows the preceding implementation's two **app-drawn teal circular actions** and a central green SECURE PASTE banner directly above the actual **white One UI keyboard switcher icon (bottom left) and IME-dismiss chevron (bottom right)**. User explicitly wants **only decorative oval backing around the two existing white OS icons**, no duplicate app-drawn buttons or text in the center, so the IME can be smaller and show more clips.
+
+**Updated implementation** (exact One UI result still pending device check):
+
+- Deleted the app's 57dp Keyboards/Refresh/central banner dock entirely. Their duplicate interactive touch targets are removed; One UI retains native keyboard-switch and dismiss functionality.
+- Removed redundant 36dp bottom visual padding in favor of ordinary 8dp IME panel padding. Enlarged the bounded scrollable clip-results viewport from max **210dp to 252dp** so the fourth card is more likely to be visible, independent of OS nav button drawing.
+- Introduced `ImeNavPillsView`, a **non-interactive, accessibility-hidden decor drawing** behind the system IME navigation glyph region: left/right translucent rounded oval backgrounds placed symmetrically based on the specific One UI image's observed horizontal positions (13.7% and 86.3% of width), confined to reported navigation-bar/system-gesture insets. The center gesture handle is never drawn over. Geometry has separate JVM tests for symmetry and bounds.
+- Uses **public window/decor/WindowInsets API only**, adds no overlays, permissions, system-button event handlers or hidden-API reflection. It inserts a decoration beneath the AOSP IME nav frame when that frame can be located. The Android/One UI OS continues to control and may render the native glyphs or navigation background in a separate/opaque layer. **If One UI does not let this transparent backing show behind native icons, the ovals may not be visible**; no system icons are removed, moved, simulated or intercepted. Do not claim exact native-button centering until observed.
+- The first visual acceptance condition is **zero duplicate controls and no central banner**. The experimental native-glyph oval backdrop has a **second separate acceptance condition** and may require another design strategy if the OEM owns an opaque system nav layer.
+- No changes to `BIOMETRIC_STRONG + CryptoObject`, visible IME auto-lock, SQLCipher queries, direct `InputConnection.commitText`, or Shizuku/system-clipboard isolation.
+
+**Acceptance checks** (not yet device-certified):
+
+- [ ] One UI gesture mode: only the **original white OS keyboard and down-arrow glyphs** remain, without their former in-app teal duplicates.
+- [ ] The two icons have subtle symmetric **oval backgrounds directly behind the real glyphs**, not floating buttons above them. If no ovals show, record that as **OEM navbar drawing limitation**, not a PASS.
+- [ ] Central gesture bar remains free of decorations and the middle SECURE PASTE text banner is absent.
+- [ ] Fourth clip remains visible or reachable by scroll, and its button is never obscured.
+- [ ] Switching keyboards and dismissing IME still work via native OS icons.
+- [ ] Compare DeX and 3-button mode; no phantom ovals on layouts without these two gesture nav buttons.
+- [ ] Recheck 30-second active IME behavior, explicit screen-off lock, biometric return, wrong-editor guard and non-clipboard paste.
+
 Official API references: [Create an input method](https://developer.android.com/develop/ui/views/touch-and-input/creating-input-method), [InputMethodService](https://developer.android.com/reference/android/inputmethodservice/InputMethodService), [InputConnection](https://developer.android.com/reference/android/view/inputmethod/InputConnection).
