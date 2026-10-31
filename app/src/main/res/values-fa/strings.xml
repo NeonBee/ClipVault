@@ -90,11 +90,9 @@
     <string name="secure_copy_saved">در خزانهٔ رمزگذاری‌شده ذخیره شد</string>
 
     <!-- WP-07B secure IME: translated to keep lint checks strict. -->
-    <string name="secure_paste_dock_status">چسباندن امن</string>
     <string name="secure_paste_authenticating">در حال احراز هویت بیومتریک قوی…</string>
     <string name="secure_paste_ime_label">چسباندن امن ClipVault</string>
     <string name="secure_paste_panel_subtitle">درج خصوصی</string>
-    <string name="secure_paste_private_footer">درج مستقیم در کادر متن، بدون استفاده از کلیپ‌بورد سیستم</string>
     <string name="secure_paste_clear_search">پاک کردن جست‌وجو</string>
     <string name="secure_paste_count">%1$d مورد امن · برای درج لمس کنید</string>
     <string name="secure_paste_insert_item">درج مورد خزانه در کادر متن فعال</string>
