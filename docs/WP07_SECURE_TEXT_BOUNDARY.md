@@ -1,6 +1,6 @@
 # WP-07 Secure Text Boundary
 
-상태: **WP-07A Secure Copy (PROCESS_TEXT 및 별도 ACTION_SEND 공유 대상) Draft 구현·CI #98 PASS; Galaxy S23 Ultra / One UI 8.0에서 두 진입 경로의 저장·클립보드 비간섭 일부 PASS. 인증 취소/잠금 경합·Shizuku 캡처 이벤트 부재 등 보안 게이트는 미완료. WP-07B~D 미구현.** [WP-07A 구현/검증 가이드](WP07A_SECURE_COPY_POC.md) 참조.
+상태: **WP-07A Secure Copy PR #19 병합 / CI #116 verify·instrumentation SUCCESS / Galaxy S23 Ultra One UI 8의 ACTION_PROCESS_TEXT·보안 ACTION_SEND 별도 검증 PASS(관측 범위). WP-07B Secure IME PoC는 구현 PR 단계이며 CI 및 One UI/DeX 실기기 검증 전. WP-07C~D 미구현.** [WP-07A 검증](WP07A_SECURE_COPY_POC.md), [WP-07B 구현/검증](WP07B_SECURE_IME_POC.md) 참조.
 
 이 문서는 ClipVault가 단순한 encrypted clipboard history를 넘어, 민감한 텍스트가 가능한 한 Android/System clipboard를 통과하지 않고 vault에 들어오고 나가도록 하는 보안 경계와 UX 방향을 고정한다.
 

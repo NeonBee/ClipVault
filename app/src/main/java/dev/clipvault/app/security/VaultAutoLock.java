@@ -7,9 +7,9 @@ import java.util.function.LongSupplier;
 
 /**
  * Process-wide auto-lock policy. The vault locks after the configured delay once no ClipVault
- * activity is started, so MainActivity and QuickPasteActivity share one timer: opening QuickPaste
- * over MainActivity must not lock the vault underneath it, and a vault unlocked from QuickPaste
- * alone must still lock after it closes.
+ * activity is started AND the secure paste IME panel is hidden. The retrieval-only IME is a
+ * visible, explicitly user-selected vault surface even when the target editor belongs to
+ * another app. Screen-off/device-lock paths remain immediate and bypass this timer.
  */
 public final class VaultAutoLock {
     public static final long DEFAULT_DELAY_MS = 30_000L;
@@ -26,6 +26,7 @@ public final class VaultAutoLock {
     private final BooleanSupplier unlocked;
     private final Runnable lockTask;
     private int startedActivities;
+    private boolean secureImeVisible;
 
     public VaultAutoLock(@NonNull Scheduler scheduler, @NonNull LongSupplier configuredDelayMs,
                          @NonNull BooleanSupplier unlocked, @NonNull Runnable lock) {
@@ -41,10 +42,26 @@ public final class VaultAutoLock {
         scheduler.cancel(lockTask);
     }
 
+    /**
+     * Main thread only. Idempotent: only the visible retrieval-only IME window counts as
+     * an active Vault surface. Hiding it starts the configured *background* delay just
+     * like the final ClipVault Activity stopping; it never modifies lock epoch or biometrics.
+     */
+    public void onSecureImeVisibilityChanged(boolean visible) {
+        if (secureImeVisible == visible) return;
+        secureImeVisible = visible;
+        if (visible) {
+            scheduler.cancel(lockTask);
+        } else if (startedActivities == 0 && unlocked.getAsBoolean()) {
+            scheduler.cancel(lockTask);
+            scheduler.schedule(lockTask, clampDelay(configuredDelayMs.getAsLong()));
+        }
+    }
+
     /** Main thread only. A configuration change restarts the activity immediately, so it does not arm the timer. */
     public void onActivityStopped(boolean changingConfigurations) {
         if (startedActivities > 0) startedActivities--;
-        if (startedActivities == 0 && !changingConfigurations && unlocked.getAsBoolean()) {
+        if (startedActivities == 0 && !secureImeVisible && !changingConfigurations && unlocked.getAsBoolean()) {
             scheduler.cancel(lockTask);
             scheduler.schedule(lockTask, clampDelay(configuredDelayMs.getAsLong()));
         }
@@ -56,7 +73,7 @@ public final class VaultAutoLock {
      * the stop armed nothing); arm the timer now in that case.
      */
     public void onVaultUnlocked() {
-        if (startedActivities == 0 && unlocked.getAsBoolean()) {
+        if (startedActivities == 0 && !secureImeVisible && unlocked.getAsBoolean()) {
             scheduler.cancel(lockTask);
             scheduler.schedule(lockTask, clampDelay(configuredDelayMs.getAsLong()));
         }
