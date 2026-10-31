@@ -93,6 +93,14 @@
 
 삼성 인터넷은 Android PROCESS_TEXT 자체를 전역 차단하는 앱이 **아니다**. 동일 앱의 화면 모드별 외부 액션 표시 차이까지 확인됨. 원인이 One UI의 DeX 메뉴 정책인지, 앱의 선택 메뉴 구현인지, 오버플로우/메뉴 제한인지는 미확정. Obsidian은 두 모드 모두 직접 팝업에서 미표시. **Android 공유 시트의 별도 Secure Copy 대상 기능과 직접 선택 메뉴 노출을 혼동하지 않는다.**
 
+### 진단에 'debug capture 미실행 또는 구버전'이 표시될 때
+
+2026-10-31에 확인한 초기화 버그: 카운터는 기존 구현에서 **첫 이벤트 전에는 prefs에 기록되지 않아서 0과 미활성 상태를 구분하지 못했음**. 이제 디버그 `ClipboardCaptureService.onCreate()`에서 두 카운터를 즉시 `0`으로 초기화하며, 기존 누적 값은 보존한다.
+
+Windows PowerShell에서 최신 브랜치로 `git pull --ff-only` 후 `scripts/deploy-debug.ps1`로 **덮어 설치**한다. Shizuku 앱에서 서버 실행 상태·ClipVault 권한 확인, ClipVault Main의 **Capture** 토글을 **OFF → ON**하여 서비스를 재생성한다. `scripts/device-validation-record.ps1` 실행 시, 새 APK/서비스가 실행됐으면 `Debug Shizuku listener events | 0` 및 `Debug distinct clipboard captures | 0` 또는 기존 누적 숫자가 표시된다. Bridge mode가 `READY_EVENT` 또는 `READY_POLL`인지 확인한다.
+
+카운터 숫자가 나와도 **일반 복사 컨트롤 테스트에서 실제 카운터 증가를 검증해야** Secure Copy 이벤트 부재의 관측으로 해석할 수 있다. `READY_POLL`은 listener 이벤트 수가 증가하지 않을 수 있으므로 capture counter 중심으로 확인한다. 실기기에서 전체 Android instrumentation, uninstall, clear-data를 실행하지 않는다.
+
 ### Shizuku clipboard-event 비간섭 계측 방법 (디버그 APK 전용)
 
 PR #19 후속 커밋의 `ClipboardCaptureService`는 **콘텐츠·해시·길이·시각 없이** 두 누적 숫자만 앱 private prefs에 쓴다.
