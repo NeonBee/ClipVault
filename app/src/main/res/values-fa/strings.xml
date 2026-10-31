@@ -90,6 +90,7 @@
     <string name="secure_copy_saved">در خزانهٔ رمزگذاری‌شده ذخیره شد</string>
 
     <!-- WP-07B secure IME: translated to keep lint checks strict. -->
+    <string name="secure_paste_dock_status">چسباندن امن</string>
     <string name="secure_paste_ime_label">چسباندن امن ClipVault</string>
     <string name="secure_paste_panel_subtitle">درج خصوصی</string>
     <string name="secure_paste_private_footer">درج مستقیم در کادر متن، بدون استفاده از کلیپ‌بورد سیستم</string>
