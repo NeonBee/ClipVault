@@ -88,4 +88,27 @@
     <string name="secure_copy_invalid">متن معتبری دریافت نشد. هیچ‌چیز ذخیره نشد.</string>
     <string name="secure_copy_failed">ذخیرهٔ امن انجام نشد. از کلیپ‌بورد به‌عنوان مسیر جایگزین استفاده نشد.</string>
     <string name="secure_copy_saved">در خزانهٔ رمزگذاری‌شده ذخیره شد</string>
+
+    <!-- WP-07B secure IME: translated to keep lint checks strict. -->
+    <string name="secure_paste_ime_label">چسباندن امن ClipVault</string>
+    <string name="secure_paste_panel_subtitle">درج خصوصی</string>
+    <string name="secure_paste_private_footer">درج مستقیم در کادر متن، بدون استفاده از کلیپ‌بورد سیستم</string>
+    <string name="secure_paste_clear_search">پاک کردن جست‌وجو</string>
+    <string name="secure_paste_count">%1$d مورد امن · برای درج لمس کنید</string>
+    <string name="secure_paste_insert_item">درج مورد خزانه در کادر متن فعال</string>
+    <string name="secure_paste_switch_keyboard">صفحه‌کلیدها</string>
+    <string name="secure_paste_unlock">باز کردن قفل</string>
+    <string name="secure_paste_refresh">تازه‌سازی</string>
+    <string name="secure_paste_recent">اخیر</string>
+    <string name="secure_paste_pinned">سنجاق‌شده‌ها</string>
+    <string name="secure_paste_search_hint">جست‌وجو (صفحه‌کلید فیزیکی)</string>
+    <string name="secure_paste_locked">خزانه قفل است. برای دیدن موارد احراز هویت کنید.</string>
+    <string name="secure_paste_editor_unavailable">این کادر متن پشتیبانی نمی‌شود. یک کادر متن معمولی انتخاب کنید.</string>
+    <string name="secure_paste_loading">در حال بارگذاری موارد خزانهٔ رمزگذاری‌شده…</string>
+    <string name="secure_paste_empty">مورد منطبقی یافت نشد.</string>
+    <string name="secure_paste_select">برای درج مستقیم در کادر متن، یک مورد انتخاب کنید.</string>
+    <string name="secure_paste_failed">درج یا بازیابی ناموفق بود. چیزی در کلیپ‌بورد سیستم کپی نشد.</string>
+    <string name="secure_paste_inserted_manual_switch">درج پذیرفته شد. برای بازگشت، صفحه‌کلیدها را انتخاب کنید.</string>
+    <string name="secure_paste_unlock_description">برای باز کردن خزانه با هویت‌سنجی بیومتریک قوی تأیید کنید و به کادر متن بازگردید.</string>
+    <string name="secure_paste_unlock_failed">باز کردن خزانه ممکن نشد. به ClipVault بازگردید یا دوباره تلاش کنید.</string>
 </resources>
