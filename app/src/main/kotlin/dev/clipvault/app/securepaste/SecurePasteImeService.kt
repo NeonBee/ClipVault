@@ -10,6 +10,7 @@ import android.graphics.drawable.RippleDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.widget.ImageView
+import android.widget.FrameLayout
 import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.os.Build
@@ -56,6 +57,7 @@ class SecurePasteImeService : InputMethodService() {
     private var inserting = false
     private var deferredSearch: Runnable? = null
     private var imeWindowVisible = false
+    private var systemNavAccents: ImeNavPillsView? = null
 
     private val lockListener = Runnable {
         clearSensitiveState()
@@ -95,10 +97,10 @@ class SecurePasteImeService : InputMethodService() {
             gravity = Gravity.CENTER_HORIZONTAL
             // Preserve editor-side hardware typing until the user explicitly taps Search.
             isFocusableInTouchMode = true
-            // One UI's bottom-left keyboard switcher can protrude above the black
-            // gesture-nav strip. Add 8dp to the manually verified 28dp bottom safe
-            // space so its symbol never visually touches the last clip row.
-            setPadding(dp(12), dp(10), dp(12), dp(36))
+            // System gesture controls belong to the OS, not this input view.
+            // Keep only ordinary panel padding; optional backdrop ovals are drawn
+            // behind the real OS icons in the IME window's navigation region.
+            setPadding(dp(12), dp(10), dp(12), dp(8))
             setBackgroundColor(ui.background)
         }
         val panel = LinearLayout(this).apply {
@@ -245,54 +247,15 @@ class SecurePasteImeService : InputMethodService() {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(2), 0, dp(3))
         }
-        val listHeight = (resources.configuration.screenHeightDp / 3).coerceIn(128, 210)
+        // Reclaim the old 57dp dock and 28dp of redundant gesture padding;
+        // more clip rows now fit without any in-panel keyboard controls.
+        val listHeight = (resources.configuration.screenHeightDp / 3).coerceIn(164, 252)
         panel.addView(ScrollView(this).apply {
             isFillViewport = true
             clipToPadding = false
             addView(rows)
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(listHeight)))
 
-        // A separate 56dp dock BELOW the scrolling clip list. Both circular actions
-        // have equal dimensions; neither can cover the fourth item or the nav switcher.
-        // The OS-provided One UI keyboard switcher remains controlled by the system.
-        val dock = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(2), dp(7), dp(2), 0)
-        }
-        dock.addView(roundDockAction("⌨", R.string.secure_paste_switch_keyboard) {
-            showPicker()
-        }, LinearLayout.LayoutParams(dp(48), dp(48)))
-        dock.addView(LinearLayout(this).apply {
-            gravity = Gravity.CENTER
-            orientation = LinearLayout.VERTICAL
-            background = shape(ui.accentSurface, 16)
-            setPadding(dp(9), dp(7), dp(9), dp(7))
-            addView(TextView(this@SecurePasteImeService).apply {
-                text = getString(R.string.secure_paste_dock_status)
-                setTextColor(ui.accent)
-                textSize = 10f
-                typeface = Typeface.DEFAULT_BOLD
-                gravity = Gravity.CENTER
-                maxLines = 1
-            })
-            addView(TextView(this@SecurePasteImeService).apply {
-                setText(R.string.secure_paste_private_footer)
-                setTextColor(ui.secondary)
-                textSize = 10f
-                gravity = Gravity.CENTER
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-            })
-        }, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-            marginStart = dp(10)
-            marginEnd = dp(10)
-        })
-        dock.addView(roundDockAction("⟳", R.string.secure_paste_refresh) {
-            refresh()
-        }, LinearLayout.LayoutParams(dp(48), dp(48)))
-        panel.addView(dock, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(57)))
         updateFilters()
         return root
     }
@@ -313,6 +276,7 @@ class SecurePasteImeService : InputMethodService() {
 
     override fun onWindowShown() {
         super.onWindowShown()
+        installNavigationAccents()
         // Unlike an Activity, the IME does not contribute to ActivityLifecycleCallbacks.
         // A visible user-selected panel is foreground Vault UI: pause only the background
         // timeout, not explicit / screen-off locks. The callback may be repeated on One UI.
@@ -347,6 +311,10 @@ class SecurePasteImeService : InputMethodService() {
     override fun onDestroy() {
         // onWindowHidden is not guaranteed before process/service teardown.
         updateImeVisibility(false)
+        systemNavAccents?.let { accent ->
+            (accent.parent as? android.view.ViewGroup)?.removeView(accent)
+        }
+        systemNavAccents = null
         app.removeLockListener(lockListener)
         app.removeVaultOpenedListener(vaultOpenedListener)
         clearSensitiveState()
@@ -358,6 +326,43 @@ class SecurePasteImeService : InputMethodService() {
         recentTab = null
         pinnedTab = null
         super.onDestroy()
+    }
+
+    /**
+     * Decorative background only, behind system-controlled One UI IME nav icons.
+     * No fake buttons, gesture interception or accessibility elements.
+     * Android/One UI may own the nav surface separately or draw an opaque frame:
+     * in that case decorations simply will not appear (safe fallback).
+     */
+    private fun installNavigationAccents() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        if (systemNavAccents?.parent != null) {
+            systemNavAccents?.invalidate()
+            return
+        }
+        val imeWindow = window?.window ?: return
+        val decor = imeWindow.decorView as? FrameLayout ?: return
+        imeWindow.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+        imeWindow.navigationBarColor = Color.TRANSPARENT
+        imeWindow.isNavigationBarContrastEnforced = false
+
+        val accents = ImeNavPillsView(this, ui.accent, ui.surface)
+        accents.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        accents.isClickable = false
+        accents.isFocusable = false
+        // In AOSP the navigation button frame is above normal decor children.
+        // Insert immediately before it when present, so the actual OS glyphs
+        // remain on top and the decorations never replace their touch targets.
+        val osNavIndex = (0 until decor.childCount).firstOrNull { index ->
+            decor.getChildAt(index).javaClass.name ==
+                "android.inputmethodservice.navigationbar.NavigationBarFrame"
+        }
+        val position = osNavIndex ?: decor.childCount
+        decor.addView(accents, position, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT,
+        ))
+        systemNavAccents = accents
     }
 
     private fun refresh() {
@@ -546,20 +551,6 @@ class SecurePasteImeService : InputMethodService() {
     private fun touchShape(fill: Int, radiusDp: Int, border: Int? = null): RippleDrawable =
         RippleDrawable(ColorStateList.valueOf(ui.ripple),
             shape(fill, radiusDp, border), shape(Color.WHITE, radiusDp))
-
-    private fun roundDockAction(
-        label: String, description: Int, action: () -> Unit,
-    ): TextView = TextView(this).apply {
-        text = label
-        textSize = 24f
-        setTextColor(ui.accent)
-        gravity = Gravity.CENTER
-        contentDescription = getString(description)
-        isClickable = true
-        isFocusable = true
-        background = touchShape(ui.surface, 24, ui.outline)
-        setOnClickListener { action() }
-    }
 
     private fun actionText(label: String, color: Int, fill: Int, border: Int?): TextView =
         TextView(this).apply {
