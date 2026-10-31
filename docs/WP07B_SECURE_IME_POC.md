@@ -124,4 +124,25 @@ After the initial UI refresh, user reported two regressions on an actual Galaxy 
 
 **Hardware keyboard focus routing:** With a physical keyboard connected and ClipVault IME visible, user observed keystrokes appearing in the browser **address bar** instead of ClipVault's intended search. Kept as a **distinct OPEN, deferred follow-up**, documented in [WP07B_HARDWARE_KEYBOARD_FOCUS_FOLLOWUP.md](WP07B_HARDWARE_KEYBOARD_FOCUS_FOLLOWUP.md). GitHub Issue creation was attempted but this repository has **Issues disabled (HTTP 410)**; the document and PR discussion are the tracking record. No assumption about root cause, browser implementation or exact focus path; separate from prior DeX Hangul composition limitation.
 
+## WP-07B UI revision 2 — balanced dock + native biometric dialog (2026-10-31)
+
+**User request:** One UI gesture-nav keyboard chooser symbol still looked off-center in a black band after increasing bottom padding. Prefer symmetric floating circular controls, without obscuring the fourth clip row; replace the separate full-page unlock appearance with a biometric prompt perceived as part of the keyboard workflow. Screenshots cannot be captured because `FLAG_SECURE` protects the IME.
+
+**Implementation (PR #20; device acceptance pending):**
+
+- Replaced the header Keyboards text button and filter-row Refresh icon with an **independent bottom dock** after the scrollable list: **48dp circular Keyboards** (left), centered `SECURE PASTE`/direct-insert privacy pill, **48dp circular Refresh** (right). Dock height 57dp, separate from clip cards and their independent scroll container. The previously added 36dp bottom safe area remains.
+- Samsung/Android's **system keyboard switcher in the gesture navigation area is NOT part of our View hierarchy**. We cannot restyle, recenter or replace its actual glyph with circles. The symmetrical in-app dock only improves composition and keeps clickable surfaces away from the OEM/system switcher.
+- `SecurePasteUnlockActivity` **remains required** by AndroidX `BiometricPrompt` (needs foreground `FragmentActivity`). It is now a **transparent, non-dimming, tiny host with no separate full-screen explanation page**; the existing `BIOMETRIC_STRONG + CryptoObject` system prompt appears directly as the foreground auth UI. It remains unexported and `FLAG_SECURE`.
+- `ClipVaultApp` notifies visible IME listeners of a successful lock-epoch-validated Vault opening, without transferring keys/clip plaintext/editor handles; `SecurePasteImeService` revalidates the current editor and epoch before refreshing the secure list. An OEM can still hide/restart the IME when any Activity comes to foreground: never claim an always-visible underlying keyboard until One UI is tested.
+- Original Secure Paste transport, field-rejection rules, Shizuku isolation, auto-lock policy, screen-off lock, SMS/credential safety, and encrypted database remain unchanged. Hardware-keyboard focus routing / Hangul issues remain deferred.
+
+**Real-device acceptance (pending specifically for this revision):**
+
+- [ ] Gesture mode: left/right **in-app circles** visually balanced, keyboard switcher system icon below not overlapped; fourth clip row accessible by scrolling and can be tapped.
+- [ ] Landscape / DeX / narrow displays: no clipping, center pill truncation acceptable, both 48dp touch actions accessible, dark mode readable.
+- [ ] From a locked Vault, tap **Unlock**: no former white/full-screen explanatory Activity; Android system biometric dialog appears above original editor/IME without unexpected navigation. Revisit focus if OEM hides the IME.
+- [ ] Successful strong biometric → unlocked rows visible in same IME session or after standard reselect/refocus; canceled/failed biometrics never expose results; no plaintext cache/preview while locked.
+- [ ] Verify target correct, insertion exactly once; system clipboard/Samsung history unchanged, Shizuku listener/capture delta zero.
+- [ ] IME shown >45s does not trigger background auto-lock; hide IME → configured auto-lock resumes, screen-off still immediate.
+
 Official API references: [Create an input method](https://developer.android.com/develop/ui/views/touch-and-input/creating-input-method), [InputMethodService](https://developer.android.com/reference/android/inputmethodservice/InputMethodService), [InputConnection](https://developer.android.com/reference/android/view/inputmethod/InputConnection).
