@@ -60,10 +60,9 @@ class SecureCopyActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
         app = application as ClipVaultApp
         // Never restore selection text from a saved instance state after process death/rotation.
-        selectedText = if (savedInstanceState == null) SecureCopyRequest.incomingText(intent) else null
+        val received = SecureCopyRequest.consumeAndClear(intent)
+        selectedText = if (savedInstanceState == null) received else null
         status = if (selectedText == null) Status.INVALID else Status.READY
-        intent?.removeExtra(android.content.Intent.EXTRA_PROCESS_TEXT)
-        intent?.removeExtra(android.content.Intent.EXTRA_TEXT)
         setIntent(android.content.Intent())
         unlocker = BiometricVaultUnlock(this, app, VaultKeyManager(this), unlockListener)
         app.addLockListener(lockListener)
