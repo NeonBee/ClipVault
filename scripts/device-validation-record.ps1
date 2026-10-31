@@ -84,6 +84,13 @@ function Get-Pref([string]$Xml, [string]$Name) {
     return ''
 }
 
+function Get-LongPref([string]$Xml, [string]$Name) {
+    $pattern = '<long name="' + [regex]::Escape($Name) + '" value="([0-9]+)"\s*/>'
+    $match = [regex]::Match($Xml, $pattern)
+    if ($match.Success) { return $match.Groups[1].Value }
+    return ''
+}
+
 function Get-LockLog([string]$Xml) {
     # lock_log 값은 여러 줄이다. SharedPreferences XML 은 줄바꿈을 그대로 두거나 &#10; 로 escape 하므로
     # (?s) 로 여러 줄을 잡고 HtmlDecode 로 entity 를 푼다. 각 줄: 사유;시각ms;unlock후ms;창;interactive;keyguard;deviceLocked;DeX
@@ -136,6 +143,8 @@ if (-not $shizukuUser -and $shizukuManagerOnly) { $shizukuUser = '미실행(매�
 $prefsXml = (Invoke-Adb shell run-as $Package cat shared_prefs/clipvault_settings.xml) -join "`n"
 $bridgeState = Get-Pref $prefsXml 'bridge_state'
 $lastError = Get-Pref $prefsXml 'last_capture_error'
+$debugBridgeEvents = Get-LongPref $prefsXml 'debug_bridge_event_count'
+$debugCaptureAccepts = Get-LongPref $prefsXml 'debug_capture_accept_count'
 $lockEvents = @(Get-LockLog $prefsXml)
 
 $testResult = '실행 안 함(-RunTest 로 실행)'
@@ -191,6 +200,8 @@ $rows = @(
     @('Shizuku server user', (Or-Default $shizukuUser '미확인(Shizuku 미실행)')),
     @('Bridge mode', (Or-Default $bridgeState '미확인(capture 서비스 중지, 또는 release 빌드 → 설정 > 진단 확인)')),
     @('Last sanitized error', (Or-Default $lastError '없음')),
+    @('Debug Shizuku listener events', (Or-Default $debugBridgeEvents '미수집(현재 debug capture 미실행 또는 구버전)')),
+    @('Debug distinct clipboard captures', (Or-Default $debugCaptureAccepts '미수집(현재 debug capture 미실행 또는 구버전)')),
     @('ShizukuRealDeviceInstrumentedTest', $testResult)
 )
 
