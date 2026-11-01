@@ -42,6 +42,18 @@ internal enum class SecurePasteCategory(
             NativeClassifier.PHONE or NativeClassifier.LONG_TEXT,
     );
 
+    /** Only these browse folders are user-editable; legacy SENSITIVE is immutable. */
+    val canEdit: Boolean
+        get() = this != ALL && this != SENSITIVE && this != UNCLASSIFIED
+
+    /** One representative flag used only when a user manually adds a folder. */
+    val manualAddFlag: Int
+        get() = when (this) {
+            DEVELOPMENT -> NativeClassifier.CODE
+            CONTACT -> NativeClassifier.EMAIL
+            else -> requiredFlags
+        }
+
     fun matches(flags: Int): Boolean =
         (requiredFlags == 0 || (flags and requiredFlags) != 0) &&
             (excludedFlags == 0 || (flags and excludedFlags) == 0)
