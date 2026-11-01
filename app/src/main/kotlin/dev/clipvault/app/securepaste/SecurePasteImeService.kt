@@ -470,7 +470,7 @@ class SecurePasteImeService : InputMethodService() {
                 setOnClickListener { insert(index) }
             }
             val badge = TextView(this).apply {
-                text = SecurePasteCategory.iconFor(clip.flags, clip.pinned)
+                text = SecurePasteCategory.iconFor(clip.browseFlags, clip.pinned)
                 textSize = 17f
                 gravity = Gravity.CENTER
                 setTextColor(ui.accent)
@@ -480,8 +480,8 @@ class SecurePasteImeService : InputMethodService() {
             val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             // Credentials and legacy sensitive entries may have plaintext-as-title.
             // Do not expose either their title or content preview in a browse card.
-            val protected = (clip.flags and (NativeClassifier.SENSITIVE or
-                NativeClassifier.CREDENTIAL)) != 0
+            val protected = ((clip.flags and NativeClassifier.SENSITIVE) != 0) ||
+                ((clip.flags or clip.browseFlags) and NativeClassifier.CREDENTIAL) != 0
             val firstLine = if (protected) "" else
                 clip.content.lineSequence().firstOrNull().orEmpty().trim()
             val name = if (protected) getString(R.string.secure_paste_protected_item) else
@@ -513,6 +513,19 @@ class SecurePasteImeService : InputMethodService() {
                 marginStart = dp(11)
             })
             card.addView(TextView(this).apply {
+                text = "✎"
+                textSize = 18f
+                setTextColor(ui.accent)
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = true
+                contentDescription = getString(R.string.secure_paste_edit_categories)
+                background = touchShape(ui.accentSurface, 12, null)
+                setOnClickListener { showCategoryEditor(clip) }
+            }, LinearLayout.LayoutParams(dp(42), dp(40)).apply {
+                marginEnd = dp(5)
+            })
+            card.addView(TextView(this).apply {
                 text = "↗"
                 textSize = 20f
                 setTextColor(ui.secondary)
@@ -532,6 +545,83 @@ class SecurePasteImeService : InputMethodService() {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(44),
             ))
         }
+    }
+
+    /**
+     * Inline IME category editor: no nested EditText, Activity, or text input.
+     * Only folder labels change; inherited SENSITIVE flags remain noneditable.
+     */
+    private fun showCategoryEditor(clip: ClipItem) {
+        val epoch = app.lockEpoch()
+        if (!app.isUnlocked || deviceLocked() || currentInputEditorInfo?.packageName != activePackage) {
+            clearSensitiveState()
+            return
+        }
+        val selections = SecurePasteCategory.entries.filter { it.canEdit }
+            .filter { it.matches(clip.browseFlags) }.toMutableSet()
+        rows?.removeAllViews()
+        rows?.addView(actionText(getString(R.string.secure_paste_edit_categories),
+            ui.text, ui.accentSurface, null).apply {
+            typeface = Typeface.DEFAULT_BOLD
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(38)))
+        SecurePasteCategory.entries.filter { it.canEdit }.forEach { folder ->
+            val toggle = actionText("", ui.text, ui.surface, ui.outline).apply {
+                minHeight = dp(42)
+                gravity = Gravity.CENTER_VERTICAL
+                contentDescription = getString(folder.label)
+            }
+            fun label() {
+                toggle.text = (if (folder in selections) "☑  " else "□  ") +
+                    getString(folder.label)
+            }
+            label()
+            toggle.setOnClickListener {
+                if (folder in selections) selections.remove(folder) else selections.add(folder)
+                label()
+            }
+            rows?.addView(toggle, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(42)).apply { bottomMargin = dp(3) })
+        }
+        fun save(include: Int, exclude: Int) {
+            if (!app.isUnlocked || app.lockEpoch() != epoch ||
+                deviceLocked() || currentInputEditorInfo?.packageName != activePackage) {
+                clearSensitiveState()
+                return
+            }
+            status?.setText(R.string.secure_paste_loading)
+            // Prevent another tap while an asynchronous write is in flight.
+            rows?.removeAllViews()
+            app.updateManualCategories(clip.id, include, exclude, epoch) { ok ->
+                if (ok && activePackage == currentInputEditorInfo?.packageName) {
+                    refresh()
+                } else {
+                    clearSensitiveState()
+                    status?.setText(R.string.secure_paste_editor_unavailable)
+                }
+            }
+        }
+        rows?.addView(actionText(getString(R.string.secure_paste_save_categories),
+            ui.buttonText, ui.accentButton, null).apply {
+            setOnClickListener {
+                var include = 0
+                var exclude = 0
+                SecurePasteCategory.entries.filter { it.canEdit }.forEach { folder ->
+                    val inferred = (clip.flags and folder.requiredFlags) != 0
+                    val selected = folder in selections
+                    if (selected && !inferred) include = include or folder.manualAddFlag
+                    if (!selected && inferred) exclude = exclude or folder.requiredFlags
+                }
+                save(include, exclude)
+            }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44)))
+        rows?.addView(actionText(getString(R.string.secure_paste_reset_categories),
+            ui.secondary, ui.surface, ui.outline).apply {
+            setOnClickListener { save(0, 0) }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(40)))
+        rows?.addView(actionText(getString(R.string.secure_paste_cancel_categories),
+            ui.secondary, ui.surface, ui.outline).apply {
+            setOnClickListener { renderResults() }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(40)))
     }
 
     private fun showPlaceholder(message: Int, preserveFolderBack: Boolean = false) {
