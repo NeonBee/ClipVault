@@ -44,6 +44,11 @@ public final class BrowseClassifierEvaluationTest {
         fixtures.add(fixture("ssh -p 2222 user@host.example", S));
         fixtures.add(fixture("ssh-keygen help page", 0)); // name alone is not an SSH command
         fixtures.add(fixture("SSH configuration reference", 0));
+        fixtures.add(fixture("SSH setup instructions", 0));
+        fixtures.add(fixture("sftp tutorial for beginners", 0));
+        fixtures.add(fixture("scp command syntax guide", 0));
+        fixtures.add(fixture("ssh admin@192.168.1.20", S));
+        fixtures.add(fixture("scp local.txt user@host.example:/tmp", S));
         fixtures.add(fixture("-----BEGIN OPENSSH PRIVATE KEY-----", C));
         fixtures.add(fixture("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFAKE00000000000000000000", C));
         fixtures.add(fixture("https://example.test/path?token=PLACEHOLDER1234", C));
@@ -95,7 +100,8 @@ public final class BrowseClassifierEvaluationTest {
             System.out.printf(java.util.Locale.ROOT,
                     "Browse fixture [%s] n=%d TP=%d FP=%d FN=%d TN=%d precision=%.3f recall=%.3f%n",
                     LABELS[index], fixtures.size(), tp, fp, fn, tn, precision, recall);
-            assertTrue(LABELS[index] + " synthetic precision < 0.85", precision >= 0.85);
+            assertTrue(LABELS[index] + " synthetic precision < 0.85 (TP=" + tp +
+                    ",FP=" + fp + ",FN=" + fn + ")", precision >= 0.85);
             assertTrue(LABELS[index] + " synthetic recall < 0.85", recall >= 0.85);
         }
     }
