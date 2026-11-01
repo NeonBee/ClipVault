@@ -242,4 +242,8 @@
     <string name="secure_paste_folder_contact">Contact info</string>
     <string name="secure_paste_folder_notes">Long notes</string>
     <string name="secure_paste_folder_unclassified">Unclassified</string>
+    <string name="secure_paste_folder_credentials">Credentials &amp; keys</string>
+    <string name="secure_paste_folder_finance">Finance</string>
+    <string name="secure_paste_folder_identity">Identity</string>
+    <string name="secure_paste_protected_item">Protected clip · tap to paste</string>
 </resources>
