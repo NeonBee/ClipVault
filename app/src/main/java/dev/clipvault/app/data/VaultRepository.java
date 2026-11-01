@@ -347,6 +347,47 @@ public final class VaultRepository implements AutoCloseable {
         return new ClipPage(items, query.offset + items.size(), more);
     }
 
+    /**
+     * Recalculate ONLY the browse-specific bits of existing SQLCipher rows.
+     * Legacy SENSITIVE and capture policy flags remain untouched. No migration,
+     * plaintext mirror, FTS token writes, or schema change is required.
+     *
+     * The caller MUST hold ClipVaultApp's lockEpoch monitor, ensuring screen-off
+     * lock cannot race this short bounded write transaction. A negative return
+     * means no further rows; otherwise resume strictly after the returned id.
+     */
+    public synchronized long backfillBrowseSignalsAfter(long afterId, int maxRows) {
+        ensureOpen();
+        int bound = Math.max(1, Math.min(maxRows, 32));
+        final java.util.ArrayList<long[]> updates = new java.util.ArrayList<>();
+        long lastId = -1L;
+        try (Cursor cursor = database.rawQuery(
+                "SELECT id,content,flags FROM clips WHERE id>? ORDER BY id ASC LIMIT ?",
+                new String[]{String.valueOf(Math.max(0L, afterId)), String.valueOf(bound)})) {
+            while (cursor.moveToNext()) {
+                long id = cursor.getLong(0);
+                String content = cursor.getString(1);
+                int previous = cursor.getInt(2);
+                int proposed = (previous & ~dev.clipvault.app.nativecore.NativeClassifier.BROWSE_MASK) |
+                        dev.clipvault.app.nativecore.BrowseClassifier.additionalFlags(content);
+                if (proposed != previous) updates.add(new long[]{id, proposed});
+                lastId = id;
+            }
+        }
+        if (lastId < 0L) return -1L;
+        database.beginTransaction();
+        try {
+            for (long[] update : updates) {
+                database.execSQL("UPDATE clips SET flags=? WHERE id=?",
+                        new Object[]{(int) update[1], update[0]});
+            }
+            database.setTransactionSuccessful();
+        } finally {
+            database.endTransaction();
+        }
+        return lastId;
+    }
+
     /** Compatibility surface for the 1.x adapter; new UI uses {@link #query(ClipQuery)}. */
     @NonNull
     public synchronized List<ClipRecord> query(
