@@ -292,6 +292,12 @@ public final class VaultRepository implements AutoCloseable {
             sql.append(" AND (c.flags & ?) != 0");
             arguments.add(String.valueOf(query.requiredFlag));
         }
+        // Inverse bitmask query makes Unclassified browseable with normal offset paging
+        // and without loading the whole decrypted vault into the IME process.
+        if (query.excludedFlags != 0) {
+            sql.append(" AND (c.flags & ?) = 0");
+            arguments.add(String.valueOf(query.excludedFlags));
+        }
         if (query.favoritesOnly) sql.append(" AND c.favorite=1");
         if (query.pinnedOnly) sql.append(" AND c.pinned=1");
         if (!query.domain.isEmpty()) {
