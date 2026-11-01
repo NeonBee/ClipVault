@@ -452,7 +452,8 @@ class SecurePasteImeService : InputMethodService() {
         if (categoriesMode && selectedCategory != null) renderFolderBack()
         if (results.isEmpty()) {
             status?.setText(R.string.secure_paste_empty)
-            showPlaceholder(R.string.secure_paste_empty)
+            showPlaceholder(R.string.secure_paste_empty,
+                preserveFolderBack = categoriesMode && selectedCategory != null)
             return
         }
         status?.text = getString(R.string.secure_paste_count, results.size)
@@ -525,8 +526,8 @@ class SecurePasteImeService : InputMethodService() {
         }
     }
 
-    private fun showPlaceholder(message: Int) {
-        rows?.removeAllViews()
+    private fun showPlaceholder(message: Int, preserveFolderBack: Boolean = false) {
+        if (!preserveFolderBack) rows?.removeAllViews()
         rows?.addView(TextView(this).apply {
             setText(message)
             setTextColor(ui.secondary)
