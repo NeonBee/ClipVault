@@ -231,7 +231,7 @@
     <string name="secure_paste_unlock_description">Authenticate with strong biometrics to unlock the encrypted vault. Return to the original editor to paste.</string>
     <string name="secure_paste_unlock_failed">Unable to unlock. Return to ClipVault for setup or try again.</string>
     <!-- WP-08A secure IME folder navigation over existing classification flags -->
-    <string name="secure_paste_categories">AI Categories</string>
+    <string name="secure_paste_categories">Smart folders</string>
     <string name="secure_paste_browse_folders">Choose a folder · no typing required</string>
     <string name="secure_paste_folder_back">Back to folders</string>
     <string name="secure_paste_load_more">Load more clips</string>
