@@ -27,6 +27,7 @@ import dev.clipvault.app.ClipVaultApp
 import dev.clipvault.app.R
 import dev.clipvault.app.data.ClipItem
 import dev.clipvault.app.data.ClipQuery
+import dev.clipvault.app.nativecore.NativeClassifier
 
 /**
  * Opt-in, retrieval-only secondary IME. No keylogging, generic typing, clipboard writes,
@@ -477,10 +478,16 @@ class SecurePasteImeService : InputMethodService() {
             }
             card.addView(badge, LinearLayout.LayoutParams(dp(36), dp(36)))
             val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            val firstLine = clip.content.lineSequence().firstOrNull().orEmpty().trim()
-            val name = clip.title.ifBlank { firstLine }.ifBlank {
-                getString(R.string.secure_paste_ime_label)
-            }.replace('\n', ' ').replace('\r', ' ').take(96)
+            // Credentials and legacy sensitive entries may have plaintext-as-title.
+            // Do not expose either their title or content preview in a browse card.
+            val protected = (clip.flags and (NativeClassifier.SENSITIVE or
+                NativeClassifier.CREDENTIAL)) != 0
+            val firstLine = if (protected) "" else
+                clip.content.lineSequence().firstOrNull().orEmpty().trim()
+            val name = if (protected) getString(R.string.secure_paste_protected_item) else
+                clip.title.ifBlank { firstLine }.ifBlank {
+                    getString(R.string.secure_paste_ime_label)
+                }.replace('\n', ' ').replace('\r', ' ').take(96)
             details.addView(TextView(this).apply {
                 text = name
                 setTextColor(ui.text)
@@ -489,7 +496,8 @@ class SecurePasteImeService : InputMethodService() {
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
-            val preview = clip.content.replace('\n', ' ').replace('\r', ' ').trim().take(150)
+            val preview = if (protected) "" else
+                clip.content.replace('\n', ' ').replace('\r', ' ').trim().take(150)
             if (preview.isNotBlank() && preview != name) {
                 details.addView(TextView(this).apply {
                     text = preview
