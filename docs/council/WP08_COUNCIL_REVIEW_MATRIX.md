@@ -1,8 +1,17 @@
 # WP-08 Council Review Matrix / 독립 리뷰 기록지
 
-**State:** OPEN, unreviewed. This template is *not* a record of completed expert or model votes. It structures the council discussion on the [WP-08 design RFC](WP08_LOCAL_AI_SEMANTIC_VAULT_RFC.md).
+**State:** CHAIR SYNTHESIS WRITTEN / MAINTAINER APPROVAL PENDING. Two attributable review messages exist. See the [chair synthesis](WP08_CHAIR_SYNTHESIS.md). This document remains the decision ledger and does *not* claim six independently completed votes.
 
 Reviewers should add their own independent positions in PR comments (or into this file in a subsequent commit). Do not fabricate names, simulate approvals, or collapse genuine disagreement into consensus.
+
+## 0. Received reviews (actual evidence, not simulated seats)
+
+| Contributor | Scope | Explicit stance | Permanent PR reference |
+| --- | --- | --- | --- |
+| Grok / xAI | **S2 Android & Background Execution** | APPROVE WITH CONDITIONS | [#6557023992](https://github.com/NeonBee/ClipVault/pull/21#issuecomment-6557023992) |
+| Claude Opus 5.5 | **S1/S3/S4/S5 cross-review**, some S6 QA/adversarial commentary | REVISE (minor) | [#6557039054](https://github.com/NeonBee/ClipVault/pull/21#issuecomment-6557039054) |
+
+Both were posted through maintainer **NeonBee** account as participant comments. Two submissions are **not** six independent seat votes; a dedicated independent red-team review is not yet evidenced. No model benchmark or user-device ML test was run by reviewers. The Chair has reconciled the positions into **recommendations**: [WP08_CHAIR_SYNTHESIS.md](WP08_CHAIR_SYNTHESIS.md).
 
 ## 1. Required perspectives and dissent questions
 
@@ -42,7 +51,9 @@ Reviewers should add their own independent positions in PR comments (or into thi
 
 A reviewer must explicitly note if no device benchmark, model trial, or external security audit was performed. **No test results from this RFC are actual runtime measurements.**
 
-## 3. Decision ledger (maintainer completes after real reviews)
+## 3. Decision ledger (chair recommendation recorded, maintainer to approve)
+
+**The “Actual decision” column remains OPEN** because the human maintainer has not approved the chair's proposals. The reasoning and per-ID proposals C1–C10 are in [the chair synthesis](WP08_CHAIR_SYNTHESIS.md).
 
 | ID | Question | Candidate decision (for debate only) | Actual decision | Owner / evidence |
 | --- | --- | --- | --- | --- |
@@ -86,11 +97,11 @@ Scores remain **TBD** until independent review and/or measured evidence. Do not 
 
 - **P0 security:** offline/no INTERNET permission, no fallback system clipboard, Shizuku listener & distinct accepted count unchanged during direct paste, direct insert exactly once.
 - **P0 lock:** password/credential examples in synthetic corpus; screen-off and background auto-lock invalidate in-flight classification and prevent later SQLCipher writes; no retained secret/vector in logging/prefs/notifications/cache.
-- **P0 DB:** schema migration from v3 with encrypted real-world-like synthetic rows and zero data loss, idempotent reassignment, human override not overwritten, trash/delete cascade, WAL + FTS5/derived metadata secure cleanup.
+- **P0 DB:** schema v3 backward compatibility (and v3→v4 migration **only if justified**) with encrypted synthetic rows and zero data loss, idempotent reassignment, human override not overwritten, trash/delete cascade, WAL + FTS5/derived metadata secure cleanup.
 - **P1 UI:** folder mode and back navigation in compact phone and DeX, no nested hardware-key text requirement, no fourth item obscured, locked metadata hidden, high/unknown previews handled according to chosen policy.
 - **P1 ML quality:** deterministic-only baseline vs embedding/LLM, Korean/English URL/SSH/secret/ambiguous string corpus with provenance; collect per-category confusion matrix and high-risk false negatives.
 - **P1 performance:** time/battery/RSS/thermal measured on S23 Ultra across 10/100/1000 synthetic items; do not infer capability from PC GPU tests.
-- **P1 scheduling:** on-save unlocked, on-unlock catch-up, manual, 1h best-effort periodic; 10 min foreground batching; canceled unlock/lock during long run.
+- **P1 scheduling:** WP-08A on-save existing rules, on-unlock catch-up and manual only; no periodic worker in A; optional B-stage 10min foreground / 1h best-effort evaluation; cancellation on lock.
 - **P2 portability:** One UI versions, other IME layouts, large fonts/landscape, backup/restore and model version upgrade behavior.
 
 **Do not execute `connectedDebugAndroidTest`, `adb uninstall` or `pm clear` on the user's populated personal Galaxy S23 Ultra.** Use CI emulator, synthetic fixtures and non-destructive on-device tests.
@@ -98,9 +109,9 @@ Scores remain **TBD** until independent review and/or measured evidence. Do not 
 ## 6. Close-out criteria
 
 The Council PR remains **Draft/open** until:
-1. real, attributable review feedback from S1–S6 is recorded or explicitly marked absent;
+1. actual reviews are attributed (Grok S2; Claude cross-S1/S3/S4/S5) and any remaining S6 or independent S1 seats are either completed or explicitly marked absent/accepted as residual risk;
 2. conflicts and blockers are documented and resolved or intentionally deferred;
 3. the maintainer records decisions C1–C10 with supporting rationale;
 4. WP-08A / B / C implementation boundaries and security gates are accepted.
 
-**No WP-08 feature is implemented by this documentation PR.** Any merged Council decision should result in separate narrowly scoped implementation PRs.
+**No WP-08 feature is implemented by this documentation PR.** Actual decision recording and user sign-off must not be inferred from a Chair report alone. Any approved Council scope should result in separate narrowly scoped implementation PRs.
