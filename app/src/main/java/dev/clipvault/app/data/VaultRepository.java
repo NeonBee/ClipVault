@@ -366,6 +366,57 @@ public final class VaultRepository implements AutoCloseable {
         return new ClipPage(items, query.offset + items.size(), more);
     }
 
+    // Only explicit folder categories can be edited. SENSITIVE and other legacy
+    // security/capture flags must never be removable through this interface.
+    private static final int MANUAL_FOLDER_MASK =
+            NativeClassifier.CREDENTIAL | NativeClassifier.FINANCE |
+            NativeClassifier.IDENTITY | NativeClassifier.CODE | NativeClassifier.JSON |
+            NativeClassifier.GITHUB | NativeClassifier.SSH_COMMAND |
+            NativeClassifier.LINK | NativeClassifier.EMAIL | NativeClassifier.PHONE |
+            NativeClassifier.LONG_TEXT;
+
+    /** Atomic manual override. This never updates native c.flags or FTS. */
+    public synchronized void setManualCategoryOverride(long clipId, int include, int exclude) {
+        ensureOpen();
+        if (clipId <= 0 || (include & ~MANUAL_FOLDER_MASK) != 0 ||
+                (exclude & ~MANUAL_FOLDER_MASK) != 0 ||
+                (include & exclude) != 0) {
+            throw new IllegalArgumentException("Invalid manual category mask");
+        }
+        try (Cursor cursor = database.rawQuery(
+                "SELECT id FROM clips WHERE id=? AND deleted_at IS NULL",
+                new String[]{String.valueOf(clipId)})) {
+            if (!cursor.moveToFirst()) throw new IllegalArgumentException("Clip missing or trashed");
+        }
+        if (include == 0 && exclude == 0) {
+            database.delete("clip_category_overrides", "clip_id=?",
+                    new String[]{String.valueOf(clipId)});
+            return;
+        }
+        ContentValues values = new ContentValues();
+        values.put("clip_id", clipId);
+        values.put("include_flags", include);
+        values.put("exclude_flags", exclude);
+        values.put("updated_at", System.currentTimeMillis());
+        database.insertWithOnConflict("clip_category_overrides", null, values,
+                SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    /** Export only user-authored overrides, never inferred vectors or plaintext. */
+    @NonNull
+    public synchronized List<ClipCategoryOverride> allManualCategoryOverrides() {
+        ensureOpen();
+        List<ClipCategoryOverride> output = new ArrayList<>();
+        try (Cursor cursor = database.rawQuery(
+                "SELECT o.clip_id,o.include_flags,o.exclude_flags FROM clip_category_overrides o " +
+                "JOIN clips c ON c.id=o.clip_id WHERE c.deleted_at IS NULL ORDER BY o.clip_id",
+                new String[0])) {
+            while (cursor.moveToNext()) output.add(new ClipCategoryOverride(
+                    cursor.getLong(0), cursor.getInt(1), cursor.getInt(2)));
+        }
+        return output;
+    }
+
     /**
      * Recalculate ONLY the browse-specific bits of existing SQLCipher rows.
      * Legacy SENSITIVE and capture policy flags remain untouched. No migration,
