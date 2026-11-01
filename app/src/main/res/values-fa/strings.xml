@@ -123,4 +123,8 @@
     <string name="secure_paste_folder_contact">اطلاعات تماس</string>
     <string name="secure_paste_folder_notes">یادداشت‌های بلند</string>
     <string name="secure_paste_folder_unclassified">دسته‌بندی‌نشده</string>
+    <string name="secure_paste_folder_credentials">کلیدها و اعتبارنامه‌ها</string>
+    <string name="secure_paste_folder_finance">اطلاعات مالی</string>
+    <string name="secure_paste_folder_identity">هویت</string>
+    <string name="secure_paste_protected_item">کلیپ محافظت‌شده · برای چسباندن لمس کنید</string>
 </resources>
