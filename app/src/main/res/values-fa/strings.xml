@@ -111,4 +111,24 @@
     <string name="secure_paste_inserted_manual_switch">درج پذیرفته شد. برای بازگشت، صفحه‌کلیدها را انتخاب کنید.</string>
     <string name="secure_paste_unlock_description">برای باز کردن خزانه با هویت‌سنجی بیومتریک قوی تأیید کنید و به کادر متن بازگردید.</string>
     <string name="secure_paste_unlock_failed">باز کردن خزانه ممکن نشد. به ClipVault بازگردید یا دوباره تلاش کنید.</string>
+    <!-- WP-08A secure IME folder navigation -->
+    <string name="secure_paste_categories">پوشه‌های هوشمند</string>
+    <string name="secure_paste_browse_folders">یک پوشه انتخاب کنید · بدون نیاز به تایپ</string>
+    <string name="secure_paste_folder_back">بازگشت به پوشه‌ها</string>
+    <string name="secure_paste_load_more">نمایش موارد بیشتر</string>
+    <string name="secure_paste_folder_all">همهٔ کلیپ‌ها</string>
+    <string name="secure_paste_folder_sensitive">حساس</string>
+    <string name="secure_paste_folder_development">برنامه‌نویسی</string>
+    <string name="secure_paste_folder_links">لینک‌ها</string>
+    <string name="secure_paste_folder_contact">اطلاعات تماس</string>
+    <string name="secure_paste_folder_notes">یادداشت‌های بلند</string>
+    <string name="secure_paste_folder_unclassified">دسته‌بندی‌نشده</string>
+    <string name="secure_paste_folder_credentials">کلیدها و اعتبارنامه‌ها</string>
+    <string name="secure_paste_folder_finance">اطلاعات مالی</string>
+    <string name="secure_paste_folder_identity">هویت</string>
+    <string name="secure_paste_protected_item">کلیپ محافظت‌شده · برای چسباندن لمس کنید</string>
+    <string name="secure_paste_edit_categories">ویرایش پوشه‌ها</string>
+    <string name="secure_paste_save_categories">ذخیرهٔ دسته‌ها</string>
+    <string name="secure_paste_reset_categories">بازنشانی به خودکار</string>
+    <string name="secure_paste_cancel_categories">لغو</string>
 </resources>

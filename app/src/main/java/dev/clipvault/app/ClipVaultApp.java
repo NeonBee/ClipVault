@@ -24,6 +24,7 @@ import androidx.work.WorkManager;
 import dev.clipvault.app.data.RetentionPolicy;
 import dev.clipvault.app.data.CaptureRuleEngine;
 import dev.clipvault.app.data.VaultRepository;
+import dev.clipvault.app.nativecore.BrowseClassifier;
 import dev.clipvault.app.nativecore.NativeClassifier;
 import dev.clipvault.app.nativecore.TextAnalysis;
 import dev.clipvault.app.security.SecurePendingStore;
@@ -69,6 +70,8 @@ public final class ClipVaultApp extends Application {
     public static final String PREF_LOCK_LOG = "lock_log";
     /** Wall-clock unlock time while the vault is open; left behind only if the process dies unlocked. */
     public static final String PREF_VAULT_OPEN_MARKER = "vault_open_marker";
+    /** Non-secret completion marker only. Actual category flags remain inside SQLCipher. */
+    private static final String PREF_BROWSE_CLASSIFIER_VERSION = "browse_classifier_version";
 
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "clipvault-io");
@@ -259,10 +262,77 @@ public final class ClipVaultApp extends Application {
             int imported = importPending(opened, retention, now);
             settings.edit().putBoolean(PREF_MAINTENANCE_PENDING, false).apply();
             notifyDataChanged();
+            // Existing clips need browse labels from the newly installed classifier.
+            // Enqueue AFTER unlock completes; each 32-row batch remains cancelable.
+            scheduleBrowseBackfill(expectedLockEpoch, 0L);
             return imported;
         } finally {
             Arrays.fill(databaseKey, (byte) 0);
         }
+    }
+
+    /**
+     * Opportunistic on-unlock catch-up; NOT a periodic/locked background worker.
+     * Run only while a biometric-unlocked Vault and the same lock epoch are active.
+     * LockVault increments the epoch under this monitor before closing SQLCipher.
+     */
+    /**
+     * Serialized and epoch-guarded explicit manual correction. The callback contains
+     * only a boolean; no clip content or editor connection crosses the thread boundary.
+     */
+    public void updateManualCategories(
+            long clipId, int include, int exclude, long expectedEpoch,
+            @NonNull java.util.function.Consumer<Boolean> callback) {
+        ioExecutor.execute(() -> {
+            boolean ok = false;
+            synchronized (lockEpoch) {
+                if (unlocked && lockEpoch.get() == expectedEpoch && repository != null) {
+                    try {
+                        repository.setManualCategoryOverride(clipId, include, exclude);
+                        ok = true;
+                    } catch (RuntimeException ignored) {
+                        // Leave UI in locked/error state. No sensitive details in logcat.
+                    }
+                }
+            }
+            final boolean result = ok;
+            mainHandler.post(() -> {
+                if (result && unlocked && lockEpoch.get() == expectedEpoch) {
+                    notifyDataChanged();
+                    callback.accept(true);
+                } else {
+                    callback.accept(false);
+                }
+            });
+        });
+    }
+
+    private void scheduleBrowseBackfill(long epoch, long afterId) {
+        if (settings.getInt(PREF_BROWSE_CLASSIFIER_VERSION, 0) >= BrowseClassifier.VERSION) return;
+        ioExecutor.execute(() -> {
+            long nextId;
+            synchronized (lockEpoch) {
+                if (!unlocked || lockEpoch.get() != epoch || repository == null) return;
+                try {
+                    nextId = repository.backfillBrowseSignalsAfter(afterId, 32);
+                } catch (RuntimeException error) {
+                    // A failed batch never marks the version complete; retry after next unlock.
+                    // No clip content or metadata is written to logcat.
+                    return;
+                }
+                if (nextId < 0L) {
+                    settings.edit().putInt(PREF_BROWSE_CLASSIFIER_VERSION,
+                            BrowseClassifier.VERSION).apply();
+                }
+            }
+            if (nextId < 0L) {
+                notifyDataChanged();
+            } else {
+                // Requeue a small batch so pending lock/close operations can run
+                // without waiting for the whole collection to be reclassified.
+                scheduleBrowseBackfill(epoch, nextId);
+            }
+        });
     }
 
     private int importPending(VaultRepository target, int retention, long now) {

@@ -95,7 +95,13 @@ class VaultDeletionHardeningInstrumentedTest {
             assertTrue(repository.query(search(marker)).items.isEmpty())
         }
         rawDatabase { db ->
-            assertEquals(3, userVersion(db))
+            // The legacy v2 FTS migration must reach the CURRENT schema,
+            // including the independent SQLCipher v4 category-override table.
+            assertEquals(VaultRepository.SCHEMA_VERSION, userVersion(db))
+            db.rawQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='clip_category_overrides'",
+                arrayOf(),
+            ).use { assertTrue("v4 manual overrides table must exist", it.moveToFirst()) }
             assertEquals(0, shadowRowsContaining(db, marker))
         }
     }

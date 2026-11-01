@@ -8,6 +8,7 @@ import dev.clipvault.app.ClipVaultApp
 import dev.clipvault.app.data.BackupClipData
 import dev.clipvault.app.data.CaptureRule
 import dev.clipvault.app.data.ClipItem
+import dev.clipvault.app.data.ClipCategoryOverride
 import dev.clipvault.app.data.ClipTagLink
 import dev.clipvault.app.data.CollectionRecord
 import dev.clipvault.app.data.TagRecord
@@ -39,7 +40,7 @@ class VaultBackupManager(private val context: Context) {
     companion object {
         private val MAGIC = byteArrayOf(0x43, 0x56, 0x4C, 0x54, 0x32) // CVLT2
         private const val CONTAINER_VERSION = 1
-        private const val PAYLOAD_VERSION = 2
+        private const val PAYLOAD_VERSION = 3
         private const val MEMORY_KIB = 65_536
         private const val ITERATIONS = 3
         private const val PARALLELISM = 1
@@ -56,6 +57,7 @@ class VaultBackupManager(private val context: Context) {
             val collections = repository.collections()
             val tags = repository.tags()
             val links = repository.allClipTagLinks()
+            val overrides = repository.allManualCategoryOverrides()
             val rules = repository.rules()
             val theme = SettingsRepository(context).settings.first()
             val manifest = BackupManifest(PAYLOAD_VERSION, System.currentTimeMillis(), clips.size,
@@ -72,7 +74,7 @@ class VaultBackupManager(private val context: Context) {
                     raw.write(header)
                     CipherOutputStream(raw, cipher).use { encrypted ->
                         JsonWriter(OutputStreamWriter(encrypted, StandardCharsets.UTF_8)).use { writer ->
-                            writePayload(writer, manifest, clips, collections, tags, links, rules, theme)
+                            writePayload(writer, manifest, clips, collections, tags, links, overrides, rules, theme)
                         }
                     }
                 } ?: error("Could not open backup destination")
@@ -135,6 +137,13 @@ class VaultBackupManager(private val context: Context) {
                 val id = repository.createRule(rule.type, rule.pattern)
                 if (!rule.enabled && id != -1L) repository.setRuleEnabled(id, false)
             }
+            // Backup source IDs differ from target IDs on merge/replace.
+            payload.overrides.forEach { record ->
+                clipMap[record.clipId]?.let { targetId ->
+                    repository.setManualCategoryOverride(
+                        targetId, record.includedFlags, record.excludedFlags)
+                }
+            }
         }
         context.getSharedPreferences(ClipVaultApp.PREFS, Context.MODE_PRIVATE).edit()
             .putInt(ClipVaultApp.PREF_RETENTION_MONTHS, payload.settings.retentionMonths)
@@ -158,6 +167,7 @@ class VaultBackupManager(private val context: Context) {
         collections: List<CollectionRecord>,
         tags: List<TagRecord>,
         links: List<ClipTagLink>,
+        overrides: List<ClipCategoryOverride>,
         rules: List<CaptureRule>,
         theme: ThemeSettings,
     ) {
@@ -214,6 +224,12 @@ class VaultBackupManager(private val context: Context) {
         writer.name("clipTags").beginArray()
         links.forEach { writer.beginArray().value(it.clipId).value(it.tagId).endArray() }
         writer.endArray()
+        writer.name("categoryOverrides").beginArray()
+        overrides.forEach { item ->
+            writer.beginArray().value(item.clipId).value(item.includedFlags.toLong())
+                .value(item.excludedFlags.toLong()).endArray()
+        }
+        writer.endArray()
         writer.name("rules").beginArray()
         rules.forEach { item ->
             writer.beginObject().name("type").value(item.type.name).name("pattern").value(item.pattern)
@@ -253,6 +269,7 @@ class VaultBackupManager(private val context: Context) {
         val collections = mutableListOf<CollectionRecord>()
         val tags = mutableListOf<TagRecord>()
         val links = mutableListOf<ClipTagLink>()
+        val overrides = mutableListOf<ClipCategoryOverride>()
         val rules = mutableListOf<CaptureRule>()
         var settings = BackupSettings()
         reader.beginObject()
@@ -263,13 +280,14 @@ class VaultBackupManager(private val context: Context) {
             "tags" -> readTags(reader, tags)
             "clips" -> readClips(reader, clips)
             "clipTags" -> readLinks(reader, links)
+            "categoryOverrides" -> readCategoryOverrides(reader, overrides)
             "rules" -> readRules(reader, rules)
             else -> reader.skipValue()
         }
         reader.endObject()
         val checked = requireNotNull(manifest) { "Backup manifest is missing" }
         require(checked.formatVersion in 1..PAYLOAD_VERSION) { "Unsupported backup version" }
-        return BackupPayload(checked, clips, collections, tags, links, rules, settings)
+        return BackupPayload(checked, clips, collections, tags, links, overrides, rules, settings)
     }
 
     private fun readSettings(reader: JsonReader): BackupSettings {
@@ -371,6 +389,23 @@ class VaultBackupManager(private val context: Context) {
         reader.endArray()
     }
 
+    private fun readCategoryOverrides(
+        reader: JsonReader, output: MutableList<ClipCategoryOverride>,
+    ) {
+        reader.beginArray()
+        while (reader.hasNext()) {
+            reader.beginArray()
+            val sourceId = reader.nextLong()
+            val include = reader.nextInt()
+            val exclude = reader.nextInt()
+            while (reader.hasNext()) reader.skipValue()
+            reader.endArray()
+            // Validate input with repository's strict, immutable SENSITIVE mask.
+            output += ClipCategoryOverride(sourceId, include, exclude)
+        }
+        reader.endArray()
+    }
+
     private fun readRules(reader: JsonReader, output: MutableList<CaptureRule>) {
         reader.beginArray()
         while (reader.hasNext()) {
@@ -436,6 +471,7 @@ class VaultBackupManager(private val context: Context) {
         val collections: List<CollectionRecord>,
         val tags: List<TagRecord>,
         val links: List<ClipTagLink>,
+        val overrides: List<ClipCategoryOverride>,
         val rules: List<CaptureRule>,
         val settings: BackupSettings,
     )

@@ -26,6 +26,42 @@ class VaultRepositoryBehaviorInstrumentedTest {
         context.deleteDatabase("clipvault.db")
     }
 
+    @Test fun manualFolderOverrideSurvivesAutomaticBackfillAndProtectsRawSecurityFlags() {
+        val id = repository.insert("입금계좌 안내", 1_000)
+        val original = repository.find(id)!!
+        val finance = dev.clipvault.app.nativecore.NativeClassifier.FINANCE
+        val identity = dev.clipvault.app.nativecore.NativeClassifier.IDENTITY
+        assertTrue(original.flags and finance != 0)
+        repository.setManualCategoryOverride(id, identity, finance)
+        val corrected = repository.query(ClipQuery.builder().build()).items.single()
+        assertTrue(corrected.flags and finance != 0) // raw classifier result unchanged
+        assertTrue(corrected.browseFlags and identity != 0)
+        assertEquals(0, corrected.browseFlags and finance)
+        assertEquals(1, repository.query(ClipQuery.builder().requiredFlag(identity).build()).items.size)
+        assertTrue(repository.query(ClipQuery.builder().requiredFlag(finance).build()).items.isEmpty())
+        assertEquals(1, repository.allManualCategoryOverrides().size)
+        repository.backfillBrowseSignalsAfter(0L, 32)
+        val afterBackfill = repository.query(ClipQuery.builder().build()).items.single()
+        assertEquals(corrected.browseFlags, afterBackfill.browseFlags)
+        assertEquals(corrected.flags, afterBackfill.flags)
+        repository.setManualCategoryOverride(id, 0, 0)
+        assertTrue(repository.allManualCategoryOverrides().isEmpty())
+        assertEquals(repository.find(id)!!.flags,
+            repository.query(ClipQuery.builder().build()).items.single().browseFlags)
+    }
+
+    @Test fun sensitiveSecurityFlagCannotBeErasedByManualFolderOverrides() {
+        val id = repository.insert("password test", 1_000)
+        val sensitive = dev.clipvault.app.nativecore.NativeClassifier.SENSITIVE
+        assertTrue(repository.find(id)!!.flags and sensitive != 0)
+        assertTrue(runCatching { repository.setManualCategoryOverride(id, 0, sensitive) }.isFailure)
+        repository.setManualCategoryOverride(id,
+            dev.clipvault.app.nativecore.NativeClassifier.CREDENTIAL, 0)
+        val clip = repository.query(ClipQuery.builder().build()).items.single()
+        assertTrue(clip.flags and sensitive != 0)
+        assertTrue(clip.browseFlags and sensitive != 0)
+    }
+
     @Test fun duplicateCaptureMergesTimesAndCount() {
         val id = repository.insert("  duplicate text  ", 2_000)
         assertEquals(id, repository.insert("duplicate text", 5_000))

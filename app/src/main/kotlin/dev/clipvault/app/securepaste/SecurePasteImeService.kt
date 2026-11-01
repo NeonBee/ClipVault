@@ -16,13 +16,10 @@ import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -30,6 +27,7 @@ import dev.clipvault.app.ClipVaultApp
 import dev.clipvault.app.R
 import dev.clipvault.app.data.ClipItem
 import dev.clipvault.app.data.ClipQuery
+import dev.clipvault.app.nativecore.NativeClassifier
 
 /**
  * Opt-in, retrieval-only secondary IME. No keylogging, generic typing, clipboard writes,
@@ -42,20 +40,22 @@ class SecurePasteImeService : InputMethodService() {
     private lateinit var app: ClipVaultApp
     private val main = Handler(Looper.getMainLooper())
     private var rows: LinearLayout? = null
-    private var search: EditText? = null
     private var status: TextView? = null
     private var unlockButton: TextView? = null
-    private var searchClear: TextView? = null
     private var recentTab: TextView? = null
     private var pinnedTab: TextView? = null
+    private var categoryTab: TextView? = null
+    private var categoriesMode = false
+    private var selectedCategory: SecurePasteCategory? = null
+    private var nextOffset = 0
+    private var hasMore = false
+    private var loading = false
     private var results: List<ClipItem> = emptyList()
     private var activePackage: String? = null
     private var sessionEpoch = -1L
     private var generation = 0L
     private var pinnedOnly = false
-    private var suppressSearch = false
     private var inserting = false
-    private var deferredSearch: Runnable? = null
     private var imeWindowVisible = false
     private var systemNavAccents: ImeNavPillsView? = null
 
@@ -139,14 +139,16 @@ class SecurePasteImeService : InputMethodService() {
         })
         header.addView(identity, LinearLayout.LayoutParams(0,
             LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(10) })
-        header.addView(TextView(this).apply {
-            text = "●"
-            textSize = 12f
-            setTextColor(ui.accent)
-            contentDescription = getString(R.string.secure_paste_ime_label)
-            gravity = Gravity.CENTER
-            background = shape(ui.accentSurface, 16)
-        }, LinearLayout.LayoutParams(dp(30), dp(30)))
+        categoryTab = actionText("✦", ui.accent, ui.accentSurface, null).apply {
+            textSize = 21f
+            contentDescription = getString(R.string.secure_paste_categories)
+            setOnClickListener {
+                categoriesMode = !categoriesMode || selectedCategory != null
+                selectedCategory = null
+                updateFilters()
+                refresh()
+            }
+        }.also { header.addView(it, LinearLayout.LayoutParams(dp(44), dp(42))) }
         panel.addView(header)
 
         status = TextView(this).apply {
@@ -166,52 +168,8 @@ class SecurePasteImeService : InputMethodService() {
         }.also { panel.addView(it, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, dp(44)).apply { bottomMargin = dp(8) }) }
 
-        // Search is local to the IME, never an editor-side text operation or clipboard read.
-        val searchRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = shape(ui.surface, 14, ui.outline)
-            setPadding(dp(12), 0, dp(8), 0)
-            minimumHeight = dp(46)
-        }
-        searchRow.addView(ImageView(this).apply {
-            setImageResource(android.R.drawable.ic_menu_search)
-            imageTintList = ColorStateList.valueOf(ui.secondary)
-            contentDescription = null // decorative: hint labels the editable search field
-        }, LinearLayout.LayoutParams(dp(20), dp(20)))
-        search = EditText(this).apply {
-            hint = getString(R.string.secure_paste_search_hint)
-            setHintTextColor(ui.secondary)
-            setTextColor(ui.text)
-            textSize = 14f
-            setSingleLine(true)
-            setShowSoftInputOnFocus(false) // Hardware search PoC, not a replacement typing IME.
-            setSaveEnabled(false)
-            isLongClickable = false
-            background = null
-            setPadding(dp(9), 0, dp(6), 0)
-            addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-                override fun afterTextChanged(s: Editable?) {
-                    searchClear?.visibility = if (s.isNullOrEmpty()) View.GONE else View.VISIBLE
-                    if (suppressSearch) return
-                    deferredSearch?.let(main::removeCallbacks)
-                    val work = Runnable { refresh() }
-                    deferredSearch = work
-                    main.postDelayed(work, 150L)
-                }
-            })
-        }.also { searchRow.addView(it, LinearLayout.LayoutParams(0, dp(46), 1f)) }
-        searchClear = actionText("×", ui.secondary, ui.surface, null).apply {
-            textSize = 22f
-            contentDescription = getString(R.string.secure_paste_clear_search)
-            visibility = View.GONE
-            setOnClickListener { search?.text?.clear() }
-        }.also { searchRow.addView(it, LinearLayout.LayoutParams(dp(35), dp(36))) }
-        panel.addView(searchRow, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(46)).apply { bottomMargin = dp(9) })
-
+        // No nested EditText: hardware-key input was routed to the host browser.
+        // All IME navigation is now touch/folder based with no keyboard interception.
         // Recent/Pinned are separate visible states rather than one ambiguous toggle button.
         val filters = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -220,21 +178,21 @@ class SecurePasteImeService : InputMethodService() {
         recentTab = actionText(getString(R.string.secure_paste_recent), ui.text,
             ui.accentSurface, null).apply {
             setOnClickListener {
-                if (pinnedOnly) {
-                    pinnedOnly = false
-                    updateFilters()
-                    refresh()
-                }
+                categoriesMode = false
+                selectedCategory = null
+                pinnedOnly = false
+                updateFilters()
+                refresh()
             }
         }.also { filters.addView(it, LinearLayout.LayoutParams(dp(94), dp(36))) }
         pinnedTab = actionText(getString(R.string.secure_paste_pinned), ui.secondary,
             ui.surface, ui.outline).apply {
             setOnClickListener {
-                if (!pinnedOnly) {
-                    pinnedOnly = true
-                    updateFilters()
-                    refresh()
-                }
+                categoriesMode = false
+                selectedCategory = null
+                pinnedOnly = true
+                updateFilters()
+                refresh()
             }
         }.also { filters.addView(it, LinearLayout.LayoutParams(dp(94), dp(36)).apply {
             marginStart = dp(7)
@@ -319,12 +277,11 @@ class SecurePasteImeService : InputMethodService() {
         app.removeVaultOpenedListener(vaultOpenedListener)
         clearSensitiveState()
         rows = null
-        search = null
         status = null
         unlockButton = null
-        searchClear = null
         recentTab = null
         pinnedTab = null
+        categoryTab = null
         super.onDestroy()
     }
 
@@ -364,9 +321,8 @@ class SecurePasteImeService : InputMethodService() {
         systemNavAccents = accents
     }
 
-    private fun refresh() {
-        deferredSearch?.let(main::removeCallbacks)
-        deferredSearch = null
+    private fun refresh(append: Boolean = false) {
+        if (append && (!hasMore || loading)) return
         val epoch = app.lockEpoch()
         val info = currentInputEditorInfo
         val isLocked = !app.isUnlocked || deviceLocked()
@@ -376,7 +332,6 @@ class SecurePasteImeService : InputMethodService() {
         )
         if (isLocked || !editorOk) {
             clearResultsOnly()
-            search?.isEnabled = false
             unlockButton?.visibility = if (isLocked) View.VISIBLE else View.GONE
             val message = if (isLocked) R.string.secure_paste_locked
                 else R.string.secure_paste_editor_unavailable
@@ -384,41 +339,122 @@ class SecurePasteImeService : InputMethodService() {
             showPlaceholder(message)
             return
         }
-        search?.isEnabled = true
         unlockButton?.visibility = View.GONE
+        // The directory contains static taxonomy names only. Do not load any clip
+        // content or even authenticated item counts until a folder is opened.
+        if (categoriesMode && selectedCategory == null) {
+            clearResultsOnly()
+            status?.setText(R.string.secure_paste_browse_folders)
+            renderCategoryFolders()
+            return
+        }
+        if (!append) {
+            clearResultsOnly()
+        }
         status?.setText(R.string.secure_paste_loading)
-        clearResultsOnly()
         sessionEpoch = epoch
         val version = ++generation
         val editor = activePackage
+        val mode = categoriesMode
+        val folder = selectedCategory
+        val pinned = pinnedOnly
+        val offset = if (append) nextOffset else 0
         val query = ClipQuery.builder()
-            .search(search?.text?.toString().orEmpty())
-            .pinnedOnly(pinnedOnly)
-            .page(30, 0)
+            .pinnedOnly(!mode && pinned)
+            .requiredFlag(if (mode) folder?.requiredFlags ?: 0 else 0)
+            .excludedFlags(if (mode) folder?.excludedFlags ?: 0 else 0)
+            .page(30, offset)
             .build()
-        // Use the same serialized executor as vault open/close and write operations.
+        loading = true
+        // Same serialized executor as SQLCipher unlock/lock/close; no separate key.
         app.io().execute {
-            val data = runCatching { app.repository()?.query(query)?.items }.getOrNull()
+            val page = runCatching { app.repository()?.query(query) }.getOrNull()
             main.post {
                 if (version != generation || !app.isUnlocked || app.lockEpoch() != epoch ||
-                    activePackage != editor || deviceLocked()
+                    activePackage != editor || categoriesMode != mode ||
+                    selectedCategory != folder || pinnedOnly != pinned || deviceLocked()
                 ) return@post
-                if (data == null) {
+                loading = false
+                if (page == null) {
                     status?.setText(R.string.secure_paste_failed)
-                    showPlaceholder(R.string.secure_paste_failed)
+                    if (!append) showPlaceholder(R.string.secure_paste_failed)
                 } else {
-                    results = data
+                    results = if (append) results + page.items else page.items
+                    nextOffset = page.nextOffset
+                    hasMore = page.hasMore
                     renderResults()
                 }
             }
         }
     }
 
+    private fun renderCategoryFolders() {
+        rows?.removeAllViews()
+        SecurePasteCategory.entries.forEach { folder ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(13), dp(10), dp(12), dp(10))
+                background = touchShape(ui.surface, 14, ui.outline)
+                isClickable = true
+                isFocusable = true
+                contentDescription = getString(folder.label)
+                setOnClickListener {
+                    selectedCategory = folder
+                    updateFilters()
+                    refresh()
+                }
+            }
+            val iconView = TextView(this).apply {
+                text = folder.glyph
+                textSize = 19f
+                gravity = Gravity.CENTER
+                setTextColor(ui.accent)
+                background = shape(ui.accentSurface, 10)
+            }
+            card.addView(iconView, LinearLayout.LayoutParams(dp(38), dp(38)))
+            card.addView(TextView(this).apply {
+                setText(folder.label)
+                textSize = 14f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ui.text)
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(12)
+            })
+            card.addView(TextView(this).apply {
+                text = "›"
+                textSize = 23f
+                gravity = Gravity.CENTER
+                setTextColor(ui.secondary)
+            }, LinearLayout.LayoutParams(dp(28), dp(36)))
+            rows?.addView(card, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = dp(6) })
+        }
+    }
+
+    private fun renderFolderBack() {
+        val back = actionText("‹  " + getString(R.string.secure_paste_categories), ui.accent,
+            ui.accentSurface, null).apply {
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            contentDescription = getString(R.string.secure_paste_folder_back)
+            setOnClickListener {
+                selectedCategory = null
+                refresh()
+            }
+        }
+        rows?.addView(back, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(36),
+        ).apply { bottomMargin = dp(7) })
+    }
+
     private fun renderResults() {
         rows?.removeAllViews()
+        if (categoriesMode && selectedCategory != null) renderFolderBack()
         if (results.isEmpty()) {
             status?.setText(R.string.secure_paste_empty)
-            showPlaceholder(R.string.secure_paste_empty)
+            showPlaceholder(R.string.secure_paste_empty,
+                preserveFolderBack = categoriesMode && selectedCategory != null)
             return
         }
         status?.text = getString(R.string.secure_paste_count, results.size)
@@ -434,7 +470,7 @@ class SecurePasteImeService : InputMethodService() {
                 setOnClickListener { insert(index) }
             }
             val badge = TextView(this).apply {
-                text = if (clip.pinned) "★" else "▤"
+                text = SecurePasteCategory.iconFor(clip.browseFlags, clip.pinned)
                 textSize = 17f
                 gravity = Gravity.CENTER
                 setTextColor(ui.accent)
@@ -442,10 +478,16 @@ class SecurePasteImeService : InputMethodService() {
             }
             card.addView(badge, LinearLayout.LayoutParams(dp(36), dp(36)))
             val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            val firstLine = clip.content.lineSequence().firstOrNull().orEmpty().trim()
-            val name = clip.title.ifBlank { firstLine }.ifBlank {
-                getString(R.string.secure_paste_ime_label)
-            }.replace('\n', ' ').replace('\r', ' ').take(96)
+            // Credentials and legacy sensitive entries may have plaintext-as-title.
+            // Do not expose either their title or content preview in a browse card.
+            val protected = ((clip.flags and NativeClassifier.SENSITIVE) != 0) ||
+                ((clip.flags or clip.browseFlags) and NativeClassifier.CREDENTIAL) != 0
+            val firstLine = if (protected) "" else
+                clip.content.lineSequence().firstOrNull().orEmpty().trim()
+            val name = if (protected) getString(R.string.secure_paste_protected_item) else
+                clip.title.ifBlank { firstLine }.ifBlank {
+                    getString(R.string.secure_paste_ime_label)
+                }.replace('\n', ' ').replace('\r', ' ').take(96)
             details.addView(TextView(this).apply {
                 text = name
                 setTextColor(ui.text)
@@ -454,7 +496,8 @@ class SecurePasteImeService : InputMethodService() {
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
-            val preview = clip.content.replace('\n', ' ').replace('\r', ' ').trim().take(150)
+            val preview = if (protected) "" else
+                clip.content.replace('\n', ' ').replace('\r', ' ').trim().take(150)
             if (preview.isNotBlank() && preview != name) {
                 details.addView(TextView(this).apply {
                     text = preview
@@ -470,6 +513,19 @@ class SecurePasteImeService : InputMethodService() {
                 marginStart = dp(11)
             })
             card.addView(TextView(this).apply {
+                text = "✎"
+                textSize = 18f
+                setTextColor(ui.accent)
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = true
+                contentDescription = getString(R.string.secure_paste_edit_categories)
+                background = touchShape(ui.accentSurface, 12, null)
+                setOnClickListener { showCategoryEditor(clip) }
+            }, LinearLayout.LayoutParams(dp(42), dp(40)).apply {
+                marginEnd = dp(5)
+            })
+            card.addView(TextView(this).apply {
                 text = "↗"
                 textSize = 20f
                 setTextColor(ui.secondary)
@@ -479,10 +535,97 @@ class SecurePasteImeService : InputMethodService() {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { bottomMargin = dp(6) })
         }
+        if (hasMore) {
+            rows?.addView(actionText(getString(R.string.secure_paste_load_more),
+                ui.accent, ui.accentSurface, null).apply {
+                isFocusable = true
+                contentDescription = getString(R.string.secure_paste_load_more)
+                setOnClickListener { refresh(append = true) }
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(44),
+            ))
+        }
     }
 
-    private fun showPlaceholder(message: Int) {
+    /**
+     * Inline IME category editor: no nested EditText, Activity, or text input.
+     * Only folder labels change; inherited SENSITIVE flags remain noneditable.
+     */
+    private fun showCategoryEditor(clip: ClipItem) {
+        val epoch = app.lockEpoch()
+        if (!app.isUnlocked || deviceLocked() || currentInputEditorInfo?.packageName != activePackage) {
+            clearSensitiveState()
+            return
+        }
+        val selections = SecurePasteCategory.entries.filter { it.canEdit }
+            .filter { it.matches(clip.browseFlags) }.toMutableSet()
         rows?.removeAllViews()
+        rows?.addView(actionText(getString(R.string.secure_paste_edit_categories),
+            ui.text, ui.accentSurface, null).apply {
+            typeface = Typeface.DEFAULT_BOLD
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(38)))
+        SecurePasteCategory.entries.filter { it.canEdit }.forEach { folder ->
+            val toggle = actionText("", ui.text, ui.surface, ui.outline).apply {
+                minHeight = dp(42)
+                gravity = Gravity.CENTER_VERTICAL
+                contentDescription = getString(folder.label)
+            }
+            fun updateLabel() {
+                toggle.text = (if (folder in selections) "☑  " else "□  ") +
+                    getString(folder.label)
+            }
+            updateLabel()
+            toggle.setOnClickListener {
+                if (folder in selections) selections.remove(folder) else selections.add(folder)
+                updateLabel()
+            }
+            rows?.addView(toggle, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(42)).apply { bottomMargin = dp(3) })
+        }
+        fun save(include: Int, exclude: Int) {
+            if (!app.isUnlocked || app.lockEpoch() != epoch ||
+                deviceLocked() || currentInputEditorInfo?.packageName != activePackage) {
+                clearSensitiveState()
+                return
+            }
+            status?.setText(R.string.secure_paste_loading)
+            // Prevent another tap while an asynchronous write is in flight.
+            rows?.removeAllViews()
+            app.updateManualCategories(clip.id, include, exclude, epoch) { ok ->
+                if (ok && activePackage == currentInputEditorInfo?.packageName) {
+                    refresh()
+                } else {
+                    clearSensitiveState()
+                    status?.setText(R.string.secure_paste_editor_unavailable)
+                }
+            }
+        }
+        rows?.addView(actionText(getString(R.string.secure_paste_save_categories),
+            ui.buttonText, ui.accentButton, null).apply {
+            setOnClickListener {
+                var include = 0
+                var exclude = 0
+                SecurePasteCategory.entries.filter { it.canEdit }.forEach { folder ->
+                    val inferred = (clip.flags and folder.requiredFlags) != 0
+                    val selected = folder in selections
+                    if (selected && !inferred) include = include or folder.manualAddFlag
+                    if (!selected && inferred) exclude = exclude or folder.requiredFlags
+                }
+                save(include, exclude)
+            }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44)))
+        rows?.addView(actionText(getString(R.string.secure_paste_reset_categories),
+            ui.secondary, ui.surface, ui.outline).apply {
+            setOnClickListener { save(0, 0) }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(40)))
+        rows?.addView(actionText(getString(R.string.secure_paste_cancel_categories),
+            ui.secondary, ui.surface, ui.outline).apply {
+            setOnClickListener { renderResults() }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(40)))
+    }
+
+    private fun showPlaceholder(message: Int, preserveFolderBack: Boolean = false) {
+        if (!preserveFolderBack) rows?.removeAllViews()
         rows?.addView(TextView(this).apply {
             setText(message)
             setTextColor(ui.secondary)
@@ -495,19 +638,27 @@ class SecurePasteImeService : InputMethodService() {
     }
 
     private fun updateFilters() {
+        val recentSelected = !categoriesMode && !pinnedOnly
+        val pinnedSelected = !categoriesMode && pinnedOnly
         recentTab?.apply {
-            setTextColor(if (!pinnedOnly) ui.accent else ui.secondary)
-            background = touchShape(if (!pinnedOnly) ui.accentSurface else ui.surface,
-                12, if (pinnedOnly) ui.outline else null)
-            typeface = if (!pinnedOnly) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-            isSelected = !pinnedOnly
+            setTextColor(if (recentSelected) ui.accent else ui.secondary)
+            background = touchShape(if (recentSelected) ui.accentSurface else ui.surface,
+                12, if (recentSelected) null else ui.outline)
+            typeface = if (recentSelected) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            isSelected = recentSelected
         }
         pinnedTab?.apply {
-            setTextColor(if (pinnedOnly) ui.accent else ui.secondary)
-            background = touchShape(if (pinnedOnly) ui.accentSurface else ui.surface,
-                12, if (pinnedOnly) null else ui.outline)
-            typeface = if (pinnedOnly) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-            isSelected = pinnedOnly
+            setTextColor(if (pinnedSelected) ui.accent else ui.secondary)
+            background = touchShape(if (pinnedSelected) ui.accentSurface else ui.surface,
+                12, if (pinnedSelected) null else ui.outline)
+            typeface = if (pinnedSelected) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            isSelected = pinnedSelected
+        }
+        categoryTab?.apply {
+            setTextColor(if (categoriesMode) ui.buttonText else ui.accent)
+            background = touchShape(if (categoriesMode) ui.accentButton else ui.accentSurface,
+                12)
+            isSelected = categoriesMode
         }
     }
 
@@ -594,20 +745,19 @@ class SecurePasteImeService : InputMethodService() {
 
     private fun clearResultsOnly() {
         generation++
+        loading = false
+        nextOffset = 0
+        hasMore = false
         results = emptyList()
         rows?.removeAllViews()
     }
 
     private fun clearSensitiveState() {
-        deferredSearch?.let(main::removeCallbacks)
-        deferredSearch = null
         clearResultsOnly()
-        suppressSearch = true
-        search?.text?.clear()
-        suppressSearch = false
         pinnedOnly = false
+        categoriesMode = false
+        selectedCategory = null
         updateFilters()
-        searchClear?.visibility = View.GONE
     }
 
     private fun openUnlockActivity() {

@@ -230,4 +230,24 @@
     <string name="secure_paste_inserted_manual_switch">Insert accepted. Use Keyboards to switch back.</string>
     <string name="secure_paste_unlock_description">Authenticate with strong biometrics to unlock the encrypted vault. Return to the original editor to paste.</string>
     <string name="secure_paste_unlock_failed">Unable to unlock. Return to ClipVault for setup or try again.</string>
+    <!-- WP-08A secure IME folder navigation over existing classification flags -->
+    <string name="secure_paste_categories">Smart folders</string>
+    <string name="secure_paste_browse_folders">Choose a folder · no typing required</string>
+    <string name="secure_paste_folder_back">Back to folders</string>
+    <string name="secure_paste_load_more">Load more clips</string>
+    <string name="secure_paste_folder_all">All clips</string>
+    <string name="secure_paste_folder_sensitive">Sensitive</string>
+    <string name="secure_paste_folder_development">Development</string>
+    <string name="secure_paste_folder_links">Links</string>
+    <string name="secure_paste_folder_contact">Contact info</string>
+    <string name="secure_paste_folder_notes">Long notes</string>
+    <string name="secure_paste_folder_unclassified">Unclassified</string>
+    <string name="secure_paste_folder_credentials">Credentials &amp; keys</string>
+    <string name="secure_paste_folder_finance">Finance</string>
+    <string name="secure_paste_folder_identity">Identity</string>
+    <string name="secure_paste_protected_item">Protected clip · tap to paste</string>
+    <string name="secure_paste_edit_categories">Edit folders</string>
+    <string name="secure_paste_save_categories">Save categories</string>
+    <string name="secure_paste_reset_categories">Reset to automatic</string>
+    <string name="secure_paste_cancel_categories">Cancel</string>
 </resources>

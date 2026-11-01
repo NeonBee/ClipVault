@@ -45,6 +45,9 @@ class VaultBackupInstrumentedTest {
         val tagId = repository.createTag("offline", "teal")
         repository.setCollection(listOf(firstId), collectionId)
         repository.setTags(firstId, listOf(tagId))
+        val finance = dev.clipvault.app.nativecore.NativeClassifier.FINANCE
+        repository.setManualCategoryOverride(firstId, finance, 0)
+        assertEquals(1, repository.allManualCategoryOverrides().size)
 
         val uri = Uri.fromFile(backupFile)
         val manifest = manager.exportVault(uri, "correct horse battery".toCharArray(), repository)
@@ -57,6 +60,10 @@ class VaultBackupInstrumentedTest {
         assertEquals(2, repository.count())
         assertEquals(1, repository.collections().size)
         assertEquals(1, repository.tags().size)
+        val afterRestore = repository.allManualCategoryOverrides().single()
+        assertTrue(repository.query(ClipQuery.builder().requiredFlag(finance).build())
+            .items.any { it.id == afterRestore.clipId })
+        assertEquals(finance, afterRestore.includedFlags)
 
         manager.importVault(uri, "correct horse battery".toCharArray(), repository, replace = false)
         assertEquals(2, repository.count())

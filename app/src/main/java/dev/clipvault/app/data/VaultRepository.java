@@ -27,7 +27,7 @@ import java.util.Locale;
 
 /** Thread-safe encrypted persistence boundary. All public operations are synchronous. */
 public final class VaultRepository implements AutoCloseable {
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
     private static final String CLIP_COLUMNS =
             "c.id,c.content,c.title,c.note,c.domain,c.first_captured_at,c.last_captured_at," +
             "c.capture_count,c.char_count,c.flags,c.favorite,c.pinned,c.collection_id,c.deleted_at";
@@ -70,6 +70,10 @@ public final class VaultRepository implements AutoCloseable {
                 // v2 index may still hold terms of clips deleted before secure-delete existed.
                 if (version == 2) rebuildSearchIndex();
                 database.execSQL("PRAGMA user_version = 3");
+            }
+            if (version < 4) {
+                createCategoryOverrideSchema();
+                database.execSQL("PRAGMA user_version = 4");
             }
             database.setTransactionSuccessful();
         } finally {
@@ -225,6 +229,15 @@ public final class VaultRepository implements AutoCloseable {
         database.execSQL("CREATE INDEX idx_clips_domain ON clips(domain,deleted_at)");
     }
 
+    /** Explicit manual classifications never overwrite the native rule's security flags. */
+    private void createCategoryOverrideSchema() {
+        database.execSQL("CREATE TABLE IF NOT EXISTS clip_category_overrides (" +
+                "clip_id INTEGER PRIMARY KEY REFERENCES clips(id) ON DELETE CASCADE," +
+                "include_flags INTEGER NOT NULL DEFAULT 0," +
+                "exclude_flags INTEGER NOT NULL DEFAULT 0," +
+                "updated_at INTEGER NOT NULL)");
+    }
+
     private void createSearchSchema() {
         database.execSQL("CREATE VIRTUAL TABLE clips_fts USING fts5(" +
                 "content,title,note,domain,content='clips',content_rowid='id',tokenize='unicode61')");
@@ -281,7 +294,13 @@ public final class VaultRepository implements AutoCloseable {
         List<ClipItem> items = new ArrayList<>();
         List<String> arguments = new ArrayList<>();
         boolean hasSearch = !query.search.isEmpty();
-        StringBuilder sql = new StringBuilder("SELECT ").append(CLIP_COLUMNS).append(" FROM clips c ");
+        // COALESCE applies manual folder corrections only to browsing; raw c.flags
+        // remains untouched for security masking and capture policy checks.
+        final String effectiveFlags =
+                "((c.flags | COALESCE(co.include_flags,0)) & ~COALESCE(co.exclude_flags,0))";
+        StringBuilder sql = new StringBuilder("SELECT ").append(CLIP_COLUMNS)
+                .append(",").append(effectiveFlags).append(" AS browse_flags FROM clips c ");
+        sql.append("LEFT JOIN clip_category_overrides co ON co.clip_id=c.id ");
         if (hasSearch) sql.append("JOIN clips_fts ON clips_fts.rowid=c.id ");
         sql.append(query.trash ? "WHERE c.deleted_at IS NOT NULL" : "WHERE c.deleted_at IS NULL");
         if (hasSearch) {
@@ -289,8 +308,14 @@ public final class VaultRepository implements AutoCloseable {
             arguments.add(toFtsQuery(query.search));
         }
         if (query.requiredFlag != 0) {
-            sql.append(" AND (c.flags & ?) != 0");
+            sql.append(" AND (").append(effectiveFlags).append(" & ?) != 0");
             arguments.add(String.valueOf(query.requiredFlag));
+        }
+        // Inverse bitmask query makes Unclassified browseable with normal offset paging
+        // and without loading the whole decrypted vault into the IME process.
+        if (query.excludedFlags != 0) {
+            sql.append(" AND (").append(effectiveFlags).append(" & ?) = 0");
+            arguments.add(String.valueOf(query.excludedFlags));
         }
         if (query.favoritesOnly) sql.append(" AND c.favorite=1");
         if (query.pinnedOnly) sql.append(" AND c.pinned=1");
@@ -339,6 +364,98 @@ public final class VaultRepository implements AutoCloseable {
         boolean more = items.size() > query.limit;
         if (more) items.remove(items.size() - 1);
         return new ClipPage(items, query.offset + items.size(), more);
+    }
+
+    // Only explicit folder categories can be edited. SENSITIVE and other legacy
+    // security/capture flags must never be removable through this interface.
+    private static final int MANUAL_FOLDER_MASK =
+            NativeClassifier.CREDENTIAL | NativeClassifier.FINANCE |
+            NativeClassifier.IDENTITY | NativeClassifier.CODE | NativeClassifier.JSON |
+            NativeClassifier.GITHUB | NativeClassifier.SSH_COMMAND |
+            NativeClassifier.LINK | NativeClassifier.EMAIL | NativeClassifier.PHONE |
+            NativeClassifier.LONG_TEXT;
+
+    /** Atomic manual override. This never updates native c.flags or FTS. */
+    public synchronized void setManualCategoryOverride(long clipId, int include, int exclude) {
+        ensureOpen();
+        if (clipId <= 0 || (include & ~MANUAL_FOLDER_MASK) != 0 ||
+                (exclude & ~MANUAL_FOLDER_MASK) != 0 ||
+                (include & exclude) != 0) {
+            throw new IllegalArgumentException("Invalid manual category mask");
+        }
+        try (Cursor cursor = database.rawQuery(
+                "SELECT id FROM clips WHERE id=? AND deleted_at IS NULL",
+                new String[]{String.valueOf(clipId)})) {
+            if (!cursor.moveToFirst()) throw new IllegalArgumentException("Clip missing or trashed");
+        }
+        if (include == 0 && exclude == 0) {
+            database.delete("clip_category_overrides", "clip_id=?",
+                    new String[]{String.valueOf(clipId)});
+            return;
+        }
+        ContentValues values = new ContentValues();
+        values.put("clip_id", clipId);
+        values.put("include_flags", include);
+        values.put("exclude_flags", exclude);
+        values.put("updated_at", System.currentTimeMillis());
+        database.insertWithOnConflict("clip_category_overrides", null, values,
+                SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    /** Export only user-authored overrides, never inferred vectors or plaintext. */
+    @NonNull
+    public synchronized List<ClipCategoryOverride> allManualCategoryOverrides() {
+        ensureOpen();
+        List<ClipCategoryOverride> output = new ArrayList<>();
+        try (Cursor cursor = database.rawQuery(
+                "SELECT o.clip_id,o.include_flags,o.exclude_flags FROM clip_category_overrides o " +
+                "JOIN clips c ON c.id=o.clip_id WHERE c.deleted_at IS NULL ORDER BY o.clip_id",
+                new String[0])) {
+            while (cursor.moveToNext()) output.add(new ClipCategoryOverride(
+                    cursor.getLong(0), cursor.getInt(1), cursor.getInt(2)));
+        }
+        return output;
+    }
+
+    /**
+     * Recalculate ONLY the browse-specific bits of existing SQLCipher rows.
+     * Legacy SENSITIVE and capture policy flags remain untouched. No migration,
+     * plaintext mirror, FTS token writes, or schema change is required.
+     *
+     * The caller MUST hold ClipVaultApp's lockEpoch monitor, ensuring screen-off
+     * lock cannot race this short bounded write transaction. A negative return
+     * means no further rows; otherwise resume strictly after the returned id.
+     */
+    public synchronized long backfillBrowseSignalsAfter(long afterId, int maxRows) {
+        ensureOpen();
+        int bound = Math.max(1, Math.min(maxRows, 32));
+        final java.util.ArrayList<long[]> updates = new java.util.ArrayList<>();
+        long lastId = -1L;
+        try (Cursor cursor = database.rawQuery(
+                "SELECT id,content,flags FROM clips WHERE id>? ORDER BY id ASC LIMIT ?",
+                new String[]{String.valueOf(Math.max(0L, afterId)), String.valueOf(bound)})) {
+            while (cursor.moveToNext()) {
+                long id = cursor.getLong(0);
+                String content = cursor.getString(1);
+                int previous = cursor.getInt(2);
+                int proposed = (previous & ~dev.clipvault.app.nativecore.NativeClassifier.BROWSE_MASK) |
+                        dev.clipvault.app.nativecore.BrowseClassifier.additionalFlags(content);
+                if (proposed != previous) updates.add(new long[]{id, proposed});
+                lastId = id;
+            }
+        }
+        if (lastId < 0L) return -1L;
+        database.beginTransaction();
+        try {
+            for (long[] update : updates) {
+                database.execSQL("UPDATE clips SET flags=? WHERE id=?",
+                        new Object[]{(int) update[1], update[0]});
+            }
+            database.setTransactionSuccessful();
+        } finally {
+            database.endTransaction();
+        }
+        return lastId;
     }
 
     /** Compatibility surface for the 1.x adapter; new UI uses {@link #query(ClipQuery)}. */
@@ -794,9 +911,11 @@ public final class VaultRepository implements AutoCloseable {
     private static ClipItem readClip(Cursor cursor) {
         Long collection = cursor.isNull(12) ? null : cursor.getLong(12);
         Long deleted = cursor.isNull(13) ? null : cursor.getLong(13);
+        int rawFlags = cursor.getInt(9);
+        int browseFlags = cursor.getColumnCount() > 14 ? cursor.getInt(14) : rawFlags;
         return new ClipItem(cursor.getLong(0), cursor.getString(1), cursor.getString(2),
                 cursor.getString(3), cursor.getString(4), cursor.getLong(5), cursor.getLong(6),
-                cursor.getInt(7), cursor.getInt(8), cursor.getInt(9), cursor.getInt(10) == 1,
+                cursor.getInt(7), cursor.getInt(8), rawFlags, browseFlags, cursor.getInt(10) == 1,
                 cursor.getInt(11) == 1, collection, deleted);
     }
 

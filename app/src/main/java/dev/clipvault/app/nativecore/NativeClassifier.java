@@ -26,6 +26,14 @@ public final class NativeClassifier {
     public static final int JSON = 1 << 15;
     public static final int MIXED_LANGUAGE = 1 << 16;
     public static final int SENSITIVE = 1 << 17;
+    // Browse-only signals; never feed back into analysis.sensitive/capture skips.
+    public static final int KOREAN = 1 << 18;
+    public static final int CREDENTIAL = 1 << 19;
+    public static final int SSH_COMMAND = 1 << 20;
+    public static final int FINANCE = 1 << 21;
+    public static final int IDENTITY = 1 << 22;
+    public static final int BROWSE_MASK =
+            KOREAN | CREDENTIAL | SSH_COMMAND | FINANCE | IDENTITY;
 
     private static final Pattern URL = Pattern.compile("(?i)(https?://|www\\.)[^\\s<>]+", Pattern.UNICODE_CASE);
     private static final Pattern EMAIL_PATTERN = Pattern.compile("(?i)[\\p{L}0-9._%+-]+@[\\p{L}0-9.-]+\\.[A-Z]{2,}");
@@ -55,7 +63,7 @@ public final class NativeClassifier {
                     boolean sensitive = "1".equals(result[2]);
                     return new TextAnalysis(
                             normalized,
-                            flags,
+                            flags | BrowseClassifier.additionalFlags(normalized),
                             sensitive,
                             result[3] == null ? "" : result[3],
                             result[4] == null ? "" : result[4],
@@ -127,7 +135,9 @@ public final class NativeClassifier {
         boolean sensitive = looksSensitive(normalized, lower);
         if (sensitive) flags |= SENSITIVE;
         if (flags == 0) flags = OTHER;
-        return new TextAnalysis(normalized, flags, sensitive, canonicalUrl, domain, count);
+        return new TextAnalysis(normalized,
+                flags | BrowseClassifier.additionalFlags(normalized),
+                sensitive, canonicalUrl, domain, count);
     }
 
     private static boolean looksSensitive(String text, String lower) {
