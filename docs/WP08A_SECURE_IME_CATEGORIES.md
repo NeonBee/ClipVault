@@ -38,6 +38,20 @@ Remaining WP-08A steps: measure JNI/Java parity and Korean/credential candidate 
 
 **Limitations awaiting separate WP-08A work:** Fine-grained false-positive/negative evaluation, validation of new string pattern quality on a Korean/English synthetic corpus, manual category overrides and explicit reclassify command UI, device performance measurements, and further IME reliability testing. Rules do not establish whether a stored value is truly a credential/finance/identity secret; the UI must never claim `LOW` from absence of a match.
 
+## Phase 3 — manual corrections and reproducible classification evaluation (2026-11-01)
+
+**Implementation (pending final CI and personal-device field validation):**
+
+- A distinct **SQLCipher schema v4** table `clip_category_overrides(clip_id PRIMARY KEY, include_flags, exclude_flags, updated_at)` references `clips(id) ON DELETE CASCADE`. Migration from v1–v3 is transactional; no pre-existing `clips.flags`, titles, custom tags or collections are overwritten.
+- SQLCipher browsing queries join overrides and compute **effective browse flags** from `(raw | include) & ~exclude`; this affects folder selection and displayed category icon only. `ClipItem.flags` stays **raw** and a new `browseFlags` field carries the effective mask. The locked-state and existing `SENSITIVE` checks remain based on raw flags; the IME also masks corrected-in credential candidates. The immutable `SENSITIVE` bit cannot be edited or excluded.
+- Tapping the separate **✎** affordance on a clip opens an **inline touch-only folder editor** in the IME: toggle Credentials, Finance, Identity, Development, Links, Contact or Notes; Save, reset to inferred classification, Cancel. No nested `EditText`, raw keyboard interception or clipboard fallback. Writes are sent through the existing serialized `ClipVaultApp.io()` executor under the same `lockEpoch` lock protecting SQLCipher closure.
+- The automatic browse backfill updates only raw candidate flags in `clips`; it does **not** modify manual overrides. Category membership changes persist through subsequent unlock/reclassification and do not affect classification of future clips.
+- Encrypted `.cvault` backup payload **v3** now includes `categoryOverrides` as ID/bitmask tuples. Import maps source clip IDs to merged destination IDs, validates masks and restores them *inside* the backup transaction. Legacy payload versions 1–2 remain parseable; manual correction loss on a backup/restore must be tested in CI. This changes the encrypted backup's payload format, not its outer crypto container or key policy.
+- Synthetic evaluation: `BrowseClassifierEvaluationTest` includes at least **30 wholly invented bilingual cases** spanning negative and positive examples for candidate CREDENTIAL, SSH_COMMAND, FINANCE, IDENTITY and KOREAN signals. Each label produces TP, FP, FN, TN, `precision = TP/(TP+FP)`, `recall = TP/(TP+FN)`, and a **predeclared synthetic fixture minimum of 0.85** for both measures. Reports **aggregate counts only**, not raw values or real secrets. These numbers **do not predict production precision/recall**; a larger consented and separately curated real-world benchmark is still needed.
+- Instrumentation tests now cover SQLCipher overrides surviving a classifier backfill, rejection of `SENSITIVE` edits, v1→v4 migration preservation and encrypted backup/restore of category corrections. No tests should be executed on the user's populated phone.
+
+**Review cautions:** A user can manually misfile a clip under another browse folder. This never lowers native security flags or removes lock/biometric gating. `UNKNOWN` does not mean LOW. Security-critical plaintext protection remains the encrypted Vault, strong authentication, sensitive-preview masking and exact-target `InputConnection.commitText` checks.
+
 ## Required validation
 
 1. **CI** `verify` + `instrumentation`, and unit tests for category overlap, excluded mask, icon priority and query builder.
