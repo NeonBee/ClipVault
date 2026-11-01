@@ -276,6 +276,37 @@ public final class ClipVaultApp extends Application {
      * Run only while a biometric-unlocked Vault and the same lock epoch are active.
      * LockVault increments the epoch under this monitor before closing SQLCipher.
      */
+    /**
+     * Serialized and epoch-guarded explicit manual correction. The callback contains
+     * only a boolean; no clip content or editor connection crosses the thread boundary.
+     */
+    public void updateManualCategories(
+            long clipId, int include, int exclude, long expectedEpoch,
+            @NonNull java.util.function.Consumer<Boolean> callback) {
+        ioExecutor.execute(() -> {
+            boolean ok = false;
+            synchronized (lockEpoch) {
+                if (unlocked && lockEpoch.get() == expectedEpoch && repository != null) {
+                    try {
+                        repository.setManualCategoryOverride(clipId, include, exclude);
+                        ok = true;
+                    } catch (RuntimeException ignored) {
+                        // Leave UI in locked/error state. No sensitive details in logcat.
+                    }
+                }
+            }
+            final boolean result = ok;
+            mainHandler.post(() -> {
+                if (result && unlocked && lockEpoch.get() == expectedEpoch) {
+                    notifyDataChanged();
+                    callback.accept(true);
+                } else {
+                    callback.accept(false);
+                }
+            });
+        });
+    }
+
     private void scheduleBrowseBackfill(long epoch, long afterId) {
         if (settings.getInt(PREF_BROWSE_CLASSIFIER_VERSION, 0) >= BrowseClassifier.VERSION) return;
         ioExecutor.execute(() -> {
