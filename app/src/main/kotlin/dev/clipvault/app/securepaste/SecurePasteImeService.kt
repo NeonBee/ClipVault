@@ -276,12 +276,11 @@ class SecurePasteImeService : InputMethodService() {
         app.removeVaultOpenedListener(vaultOpenedListener)
         clearSensitiveState()
         rows = null
-        search = null
         status = null
         unlockButton = null
-        searchClear = null
         recentTab = null
         pinnedTab = null
+        categoryTab = null
         super.onDestroy()
     }
 
