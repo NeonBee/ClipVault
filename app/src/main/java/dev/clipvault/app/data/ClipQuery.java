@@ -8,6 +8,7 @@ public final class ClipQuery {
 
     @NonNull public final String search;
     public final int requiredFlag;
+    public final int excludedFlags;
     public final boolean favoritesOnly;
     public final boolean pinnedOnly;
     public final boolean trash;
@@ -23,6 +24,7 @@ public final class ClipQuery {
     private ClipQuery(Builder builder) {
         search = builder.search;
         requiredFlag = builder.requiredFlag;
+        excludedFlags = builder.excludedFlags;
         favoritesOnly = builder.favoritesOnly;
         pinnedOnly = builder.pinnedOnly;
         trash = builder.trash;
@@ -41,6 +43,7 @@ public final class ClipQuery {
     public static final class Builder {
         private String search = "";
         private int requiredFlag;
+        private int excludedFlags;
         private boolean favoritesOnly;
         private boolean pinnedOnly;
         private boolean trash;
@@ -55,6 +58,7 @@ public final class ClipQuery {
 
         public Builder search(@NonNull String value) { search = value.trim(); return this; }
         public Builder requiredFlag(int value) { requiredFlag = value; return this; }
+        public Builder excludedFlags(int value) { excludedFlags = value; return this; }
         public Builder favoritesOnly(boolean value) { favoritesOnly = value; return this; }
         public Builder pinnedOnly(boolean value) { pinnedOnly = value; return this; }
         public Builder trash(boolean value) { trash = value; return this; }
