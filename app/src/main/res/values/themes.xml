@@ -7,4 +7,15 @@
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowNoTitle">true</item>
     </style>
+    <!-- BiometricPrompt still needs a foreground FragmentActivity. Make its host a
+         transparent, floating, non-dimming window so the system prompt appears over
+         the current editor/IME instead of navigating to a full ClipVault page. -->
+    <style name="Theme.ClipVault.SecureImeUnlock" parent="Theme.ClipVault">
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

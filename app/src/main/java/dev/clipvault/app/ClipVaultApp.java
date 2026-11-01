@@ -84,6 +84,8 @@ public final class ClipVaultApp extends Application {
     private AppContainer container;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<Runnable> lockListeners = new CopyOnWriteArrayList<>();
+    /** UI-only signal: no plaintext, database key, editor handle or Intent is carried. */
+    private final List<Runnable> vaultOpenedListeners = new CopyOnWriteArrayList<>();
     private VaultAutoLock autoLock;
     /** Incremented by every lockVault(); an unlock that started in an older epoch must not open the vault. */
     private final AtomicLong lockEpoch = new AtomicLong();
@@ -145,6 +147,19 @@ public final class ClipVaultApp extends Application {
         }, new IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_EXPORTED);
     }
 
+    /**
+     * Called on the main thread from ClipVault's own secure IME window lifecycle.
+     * A visible, explicitly selected IME is foreground Vault UI even while the
+     * editor Activity belongs to another package. This only pauses the BACKGROUND
+     * timeout; screen-off and explicit lock still invalidate the vault immediately.
+     */
+    public void onSecureImeVisibilityChanged(boolean visible) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            throw new IllegalStateException("IME visibility updates must run on the main thread");
+        }
+        if (autoLock != null) autoLock.onSecureImeVisibilityChanged(visible);
+    }
+
     /** Listeners run on the main thread after the vault has been marked locked. */
     public void addLockListener(@NonNull Runnable listener) {
         lockListeners.add(listener);
@@ -152,6 +167,15 @@ public final class ClipVaultApp extends Application {
 
     public void removeLockListener(@NonNull Runnable listener) {
         lockListeners.remove(listener);
+    }
+
+    /** A successful strong biometric unlock can update the visible IME in-place. Main thread. */
+    public void addVaultOpenedListener(@NonNull Runnable listener) {
+        vaultOpenedListeners.add(listener);
+    }
+
+    public void removeVaultOpenedListener(@NonNull Runnable listener) {
+        vaultOpenedListeners.remove(listener);
     }
 
     @NonNull
@@ -219,7 +243,13 @@ public final class ClipVaultApp extends Application {
                 settings.edit().putLong(PREF_VAULT_OPEN_MARKER, System.currentTimeMillis()).apply();
                 if (old != null) old.close();
             }
-            mainHandler.post(() -> { if (autoLock != null) autoLock.onVaultUnlocked(); });
+            mainHandler.post(() -> {
+                if (autoLock != null) autoLock.onVaultUnlocked();
+                // Only notify observers if a later lock has not invalidated this unlock.
+                if (isUnlocked() && lockEpoch.get() == expectedLockEpoch) {
+                    for (Runnable listener : vaultOpenedListeners) listener.run();
+                }
+            });
 
             ruleEngine.replace(opened.rules());
 

@@ -207,4 +207,27 @@
     <string name="secure_copy_invalid">No valid text selection was provided. Nothing was saved.</string>
     <string name="secure_copy_failed">Secure save was not completed. No clipboard fallback was used.</string>
     <string name="secure_copy_saved">Saved to encrypted vault</string>
+
+    <!-- WP-07B: secondary, retrieval-only secure IME. -->
+    <string name="secure_paste_authenticating">Authenticating with strong biometrics…</string>
+    <string name="secure_paste_ime_label">ClipVault Secure Paste</string>
+    <string name="secure_paste_panel_subtitle">PRIVATE INSERT</string>
+    <string name="secure_paste_clear_search">Clear search</string>
+    <string name="secure_paste_count">%1$d secure items · tap to insert</string>
+    <string name="secure_paste_insert_item">Insert vault item into focused editor</string>
+    <string name="secure_paste_switch_keyboard">Keyboards</string>
+    <string name="secure_paste_unlock">Unlock</string>
+    <string name="secure_paste_refresh">Refresh</string>
+    <string name="secure_paste_recent">Recent</string>
+    <string name="secure_paste_pinned">Pinned</string>
+    <string name="secure_paste_search_hint">Search (hardware keyboard)</string>
+    <string name="secure_paste_locked">Vault locked. Authenticate to view items.</string>
+    <string name="secure_paste_editor_unavailable">This editor is unavailable or unsupported. Select a normal text field.</string>
+    <string name="secure_paste_loading">Loading encrypted vault items…</string>
+    <string name="secure_paste_empty">No matching items.</string>
+    <string name="secure_paste_select">Select an item to insert directly into the focused text field.</string>
+    <string name="secure_paste_failed">Insert or lookup failed. Nothing was copied to the system clipboard.</string>
+    <string name="secure_paste_inserted_manual_switch">Insert accepted. Use Keyboards to switch back.</string>
+    <string name="secure_paste_unlock_description">Authenticate with strong biometrics to unlock the encrypted vault. Return to the original editor to paste.</string>
+    <string name="secure_paste_unlock_failed">Unable to unlock. Return to ClipVault for setup or try again.</string>
 </resources>
