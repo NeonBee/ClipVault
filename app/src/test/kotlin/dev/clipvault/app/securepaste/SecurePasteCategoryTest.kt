@@ -14,6 +14,17 @@ class SecurePasteCategoryTest {
         assertFalse(SecurePasteCategory.UNCLASSIFIED.matches(flags))
     }
 
+    @Test fun candidateCategoriesAreMultiLabelAndNeverClaimLowSensitivity() {
+        val flags = NativeClassifier.CREDENTIAL or NativeClassifier.LINK or NativeClassifier.KOREAN
+        assertTrue(SecurePasteCategory.CREDENTIALS.matches(flags))
+        assertTrue(SecurePasteCategory.LINKS.matches(flags))
+        assertFalse(SecurePasteCategory.UNCLASSIFIED.matches(flags))
+        assertEquals("⚿", SecurePasteCategory.iconFor(flags, false))
+        assertTrue(SecurePasteCategory.FINANCE.matches(NativeClassifier.FINANCE))
+        assertTrue(SecurePasteCategory.IDENTITY.matches(NativeClassifier.IDENTITY))
+        assertTrue(SecurePasteCategory.DEVELOPMENT.matches(NativeClassifier.SSH_COMMAND))
+    }
+
     @Test fun unclassifiedAcceptsOtherAndLanguageOnly() {
         assertTrue(SecurePasteCategory.UNCLASSIFIED.matches(NativeClassifier.OTHER))
         assertTrue(SecurePasteCategory.UNCLASSIFIED.matches(NativeClassifier.ENGLISH))
