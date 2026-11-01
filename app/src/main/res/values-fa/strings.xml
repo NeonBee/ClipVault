@@ -127,4 +127,8 @@
     <string name="secure_paste_folder_finance">اطلاعات مالی</string>
     <string name="secure_paste_folder_identity">هویت</string>
     <string name="secure_paste_protected_item">کلیپ محافظت‌شده · برای چسباندن لمس کنید</string>
+    <string name="secure_paste_edit_categories">ویرایش پوشه‌ها</string>
+    <string name="secure_paste_save_categories">ذخیرهٔ دسته‌ها</string>
+    <string name="secure_paste_reset_categories">بازنشانی به خودکار</string>
+    <string name="secure_paste_cancel_categories">لغو</string>
 </resources>
