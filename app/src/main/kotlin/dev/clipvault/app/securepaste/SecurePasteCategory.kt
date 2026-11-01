@@ -37,8 +37,8 @@ internal enum class SecurePasteCategory(
     );
 
     fun matches(flags: Int): Boolean =
-        (requiredFlags == 0 || flags and requiredFlags != 0) &&
-            (excludedFlags == 0 || flags and excludedFlags == 0)
+        (requiredFlags == 0 || (flags and requiredFlags) != 0) &&
+            (excludedFlags == 0 || (flags and excludedFlags) == 0)
 
     companion object {
         fun iconFor(flags: Int, pinned: Boolean): String {
