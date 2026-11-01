@@ -570,14 +570,14 @@ class SecurePasteImeService : InputMethodService() {
                 gravity = Gravity.CENTER_VERTICAL
                 contentDescription = getString(folder.label)
             }
-            fun label() {
+            fun updateLabel() {
                 toggle.text = (if (folder in selections) "☑  " else "□  ") +
                     getString(folder.label)
             }
-            label()
+            updateLabel()
             toggle.setOnClickListener {
                 if (folder in selections) selections.remove(folder) else selections.add(folder)
-                label()
+                updateLabel()
             }
             rows?.addView(toggle, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(42)).apply { bottomMargin = dp(3) })
