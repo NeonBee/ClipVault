@@ -30,8 +30,15 @@ public final class BrowseClassifier {
             "(?:ghp_[A-Za-z0-9]{12,}|github_pat_[A-Za-z0-9_]{12,}|AKIA[0-9A-Z]{16})");
     private static final Pattern TOKENIZED_URL = Pattern.compile(
             "(?i)[?&](?:token|access_token|api_key|key|sig|signature|secret|auth)=[^&#\\s]{3,}");
+    // Requiring a plausible target avoids treating documentation headings such
+    // as "SSH configuration reference" as actual connection commands. A bare
+    // ambiguous word is deliberately not classified as an SSH destination.
     private static final Pattern SSH_COMMAND = Pattern.compile(
-            "(?im)(?:^|\\s)(?:ssh|scp|sftp)\\s+(?:-[A-Za-z0-9]+\\s+)*(?:[\\w.-]+@)?[\\w.-]+(?=\\s|$|:)");
+            "(?im)(?:^|\\s)(?:ssh|sftp)\\s+(?:-[A-Za-z0-9]+(?:\\s+\\d+)?\\s+)*" +
+            "(?:[\\w.-]+@[\\w.-]+|localhost|[\\w-]+(?:\\.[\\w-]+)+)(?=\\s|$|:)");
+    private static final Pattern SCP_COMMAND = Pattern.compile(
+            "(?im)(?:^|\\s)scp\\s+(?:-[A-Za-z0-9]+\\s+)*(?:\\S+\\s+)*" +
+            "(?:[\\w.-]+@[\\w.-]+|[\\w-]+(?:\\.[\\w-]+)+):\\S+");
     private static final Pattern FINANCE_CONTEXT = Pattern.compile(
             "(?:계좌번호|입금계좌|은행계좌|카드번호|카드 번호|송금내역|이체내역|account number|bank account|card number)",
             Pattern.CASE_INSENSITIVE);
@@ -57,7 +64,9 @@ public final class BrowseClassifier {
                 TOKENIZED_URL.matcher(normalized).find()) {
             result |= NativeClassifier.CREDENTIAL;
         }
-        if (SSH_COMMAND.matcher(normalized).find()) result |= NativeClassifier.SSH_COMMAND;
+        if (SSH_COMMAND.matcher(normalized).find() || SCP_COMMAND.matcher(normalized).find()) {
+            result |= NativeClassifier.SSH_COMMAND;
+        }
         if (FINANCE_CONTEXT.matcher(normalized).find()) result |= NativeClassifier.FINANCE;
         if (IDENTITY_CONTEXT.matcher(normalized).find()) result |= NativeClassifier.IDENTITY;
         return result;
