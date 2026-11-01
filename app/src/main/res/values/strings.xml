@@ -246,4 +246,8 @@
     <string name="secure_paste_folder_finance">Finance</string>
     <string name="secure_paste_folder_identity">Identity</string>
     <string name="secure_paste_protected_item">Protected clip · tap to paste</string>
+    <string name="secure_paste_edit_categories">Edit folders</string>
+    <string name="secure_paste_save_categories">Save categories</string>
+    <string name="secure_paste_reset_categories">Reset to automatic</string>
+    <string name="secure_paste_cancel_categories">Cancel</string>
 </resources>
