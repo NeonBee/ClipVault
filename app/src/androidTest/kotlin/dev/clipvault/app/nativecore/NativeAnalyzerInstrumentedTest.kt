@@ -62,6 +62,34 @@ class NativeAnalyzerInstrumentedTest {
         }
     }
 
+    @Test fun browseFlagsAreIdenticalAfterNativeAndJavaFallbackAnalysis() {
+        val corpus = listOf(
+            "한국어 개인 메모",
+            "ssh user@host.example",
+            "-----BEGIN OPENSSH PRIVATE KEY-----",
+            "https://example.test/path?token=FAKE123456",
+            "입금계좌를 확인하세요",
+            "주민등록번호 관련 안내",
+            "https://example.test/ordinary",
+            "email@example.test",
+        )
+        corpus.forEach { sample ->
+            val native = NativeClassifier.analyze(sample)
+            val java = NativeClassifier.fallbackAnalyze(sample)
+            assertEquals("flags for synthetic input", java.flags, native.flags)
+            assertEquals("legacy sensitivity unchanged", java.sensitive, native.sensitive)
+        }
+    }
+
+    @Test fun browseOnlyTokenLabelsNeverSilentlyBecomeSensitiveCaptureRejections() {
+        val candidate = NativeClassifier.analyze("https://example.test/?token=FAKE123456")
+        assertTrue(candidate.has(NativeClassifier.CREDENTIAL))
+        assertTrue(candidate.has(NativeClassifier.LINK))
+        assertFalse(candidate.sensitive)
+        val ssh = NativeClassifier.analyze("ssh user@host.example")
+        assertTrue(ssh.has(NativeClassifier.SSH_COMMAND))
+    }
+
     @Test fun malformedUtf16DoesNotCrashAnalyzer() {
         val malformed = "prefix\uD800suffix\uDC00"
         val result = NativeClassifier.analyze(malformed)
