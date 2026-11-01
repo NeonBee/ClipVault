@@ -32,6 +32,8 @@ public final class NativeClassifier {
     public static final int SSH_COMMAND = 1 << 20;
     public static final int FINANCE = 1 << 21;
     public static final int IDENTITY = 1 << 22;
+    public static final int BROWSE_MASK =
+            KOREAN | CREDENTIAL | SSH_COMMAND | FINANCE | IDENTITY;
 
     private static final Pattern URL = Pattern.compile("(?i)(https?://|www\\.)[^\\s<>]+", Pattern.UNICODE_CASE);
     private static final Pattern EMAIL_PATTERN = Pattern.compile("(?i)[\\p{L}0-9._%+-]+@[\\p{L}0-9.-]+\\.[A-Z]{2,}");
