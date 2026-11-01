@@ -14,6 +14,8 @@ public final class ClipItem {
     public final int captureCount;
     public final int characterCount;
     public final int flags;
+    /** Effective browsing flags after manual overrides; raw security flags remain in flags. */
+    public final int browseFlags;
     public final boolean favorite;
     public final boolean pinned;
     @Nullable public final Long collectionId;
@@ -34,6 +36,26 @@ public final class ClipItem {
             boolean pinned,
             @Nullable Long collectionId,
             @Nullable Long deletedAt) {
+        this(id, content, title, note, domain, firstCapturedAt, lastCapturedAt,
+                captureCount, characterCount, flags, flags, favorite, pinned, collectionId, deletedAt);
+    }
+
+    public ClipItem(
+            long id,
+            @NonNull String content,
+            @NonNull String title,
+            @NonNull String note,
+            @NonNull String domain,
+            long firstCapturedAt,
+            long lastCapturedAt,
+            int captureCount,
+            int characterCount,
+            int flags,
+            int browseFlags,
+            boolean favorite,
+            boolean pinned,
+            @Nullable Long collectionId,
+            @Nullable Long deletedAt) {
         this.id = id;
         this.content = content;
         this.title = title;
@@ -44,6 +66,7 @@ public final class ClipItem {
         this.captureCount = captureCount;
         this.characterCount = characterCount;
         this.flags = flags;
+        this.browseFlags = browseFlags;
         this.favorite = favorite;
         this.pinned = pinned;
         this.collectionId = collectionId;
