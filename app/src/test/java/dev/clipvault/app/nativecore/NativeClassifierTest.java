@@ -20,7 +20,7 @@ public class NativeClassifierTest {
 
         TextAnalysis key = NativeClassifier.fallbackAnalyze("-----BEGIN OPENSSH PRIVATE KEY-----");
         assertTrue(key.has(NativeClassifier.CREDENTIAL));
-        assertFalse(key.sensitive); // Legacy capture skip policy deliberately unchanged.
+        assertTrue(key.sensitive); // Pre-existing 'private key' legacy rule still skips auto-capture.
 
         TextAnalysis finance = NativeClassifier.fallbackAnalyze("입금계좌 안내");
         assertTrue(finance.has(NativeClassifier.FINANCE));
